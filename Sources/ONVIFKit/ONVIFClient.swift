@@ -6,6 +6,8 @@ import VedettaL10n
 public enum ONVIFError: LocalizedError {
     case unreachable(String)
     case notAuthorized
+    /// Credentials valid, but this user may not perform the operation.
+    case notPermitted
     case fault(String)
     case badResponse
     case unsupported(String)
@@ -14,6 +16,7 @@ public enum ONVIFError: LocalizedError {
         switch self {
         case .unreachable(let s): return L("Device not reachable: %@", s)
         case .notAuthorized: return L("Wrong user name or password (ONVIF)")
+        case .notPermitted: return L("This user is not allowed to do this. Give it more permissions on the device.")
         case .fault(let s): return L("ONVIF error: %@", s)
         case .badResponse: return L("Invalid ONVIF response")
         case .unsupported(let s): return L("Feature not supported: %@", s)
@@ -53,6 +56,7 @@ public actor ONVIFClient {
     private let username: String
     private let password: String
     private let session: URLSession
+    private nonisolated let accessGuard: AccessGuard?
     private var timeOffset: TimeInterval = 0
     private var didSyncTime = false
     public private(set) var services: [String: URL] = [:]   // namespace -> XAddr
@@ -65,10 +69,11 @@ public actor ONVIFClient {
     static let nsImaging = "http://www.onvif.org/ver20/imaging/wsdl"
     static let nsSchema = "http://www.onvif.org/ver10/schema"
 
-    public init(deviceURL: URL, username: String, password: String, timeout: TimeInterval = 10) {
+    public init(deviceURL: URL, username: String, password: String, timeout: TimeInterval = 10, accessGuard: AccessGuard? = nil) {
         self.deviceURL = deviceURL
         self.username = username
         self.password = password
+        self.accessGuard = accessGuard
         self.session = DeviceSessionDelegate.makeSession(username: username, password: password, timeout: timeout)
     }
 
@@ -94,8 +99,57 @@ public actor ONVIFClient {
     }
 
     /// Sends a SOAP 1.2 request and returns the Body element.
+    /// Authenticated requests go through the device's AccessGuard (every one of them carries the credentials).
     public func soap(_ body: String, to url: URL? = nil, authenticated: Bool = true) async throws -> XNode {
         if authenticated && !didSyncTime { await syncTime() }
+        guard authenticated, !username.isEmpty, let g = accessGuard else { return try await rawSoap(body, to: url, authenticated: authenticated) }
+        let action = "ONVIF " + (body.drop { $0 != "<" }.dropFirst().prefix { $0 != " " && $0 != ">" && $0 != "/" })
+        let verified = g.state == .online
+        do {
+            return try await g.credentialed(action, important: false, { try await self.rawSoap(body, to: url, authenticated: true) }) { r in
+                switch r {
+                case .success: return .confirmed
+                case .failure(ONVIFError.notAuthorized):
+                    return .denied(L("The device refused the user name or password (ONVIF). Automatic attempts are stopped to avoid locking the account."))
+                case .failure(ONVIFError.unreachable(let m)): return .network(m)
+                default: return .neutral
+                }
+            }
+        } catch ONVIFError.notAuthorized where verified && g.state == .online {
+            // Credentials already confirmed: most likely a permission this user lacks.
+            throw ONVIFError.notPermitted
+        }
+    }
+
+    /// The device's first check: GetDeviceInformation, allowed for every ONVIF user level, through the guard.
+    public func verifyCredentials(reserved: Bool) async {
+        guard let g = accessGuard, !username.isEmpty else { return }
+        if !didSyncTime { await syncTime() }
+        let body = "<GetDeviceInformation xmlns=\"\(Self.nsDevice)\"/>"
+        _ = try? await g.credentialed("ONVIF GetDeviceInformation", reserved: reserved, { try await self.rawSoap(body, to: nil, authenticated: true) }) { r in
+            switch r {
+            case .success: return .confirmed
+            case .failure(ONVIFError.notAuthorized):
+                return .rejected(L("The device refused the user name or password (ONVIF). Automatic attempts are stopped to avoid locking the account."))
+            case .failure(ONVIFError.unreachable(let m)): return .network(m)
+            default: return .neutral
+            }
+        }
+    }
+
+    /// Checks the credentials with a request every user level may make (no guard: used by the guard itself).
+    public func credentialsStillValid() async -> Bool? {
+        do {
+            _ = try await rawSoap("<GetDeviceInformation xmlns=\"\(Self.nsDevice)\"/>", to: nil, authenticated: true)
+            return true
+        } catch ONVIFError.notAuthorized {
+            return false
+        } catch {
+            return nil
+        }
+    }
+
+    private func rawSoap(_ body: String, to url: URL?, authenticated: Bool) async throws -> XNode {
         let envelope = """
         <?xml version="1.0" encoding="UTF-8"?><s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" \
         xmlns:tt="http://www.onvif.org/ver10/schema">\(authenticated ? securityHeader() : "")<s:Body>\(body)</s:Body></s:Envelope>

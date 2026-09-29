@@ -25,6 +25,6 @@ let package = Package(
         .testTarget(name: "VigiKitTests", dependencies: ["VigiKit"], swiftSettings: v5),
         .testTarget(name: "ONVIFKitTests", dependencies: ["ONVIFKit"], swiftSettings: v5),
         .testTarget(name: "MediaKitTests", dependencies: ["MediaKit", "RTSPKit"], swiftSettings: v5),
-        .testTarget(name: "VedettaCoreTests", dependencies: ["VedettaCore", "ONVIFKit"], swiftSettings: v5),
+        .testTarget(name: "VedettaCoreTests", dependencies: ["VedettaCore", "ONVIFKit", "VigiKit", "NetKit", "RTSPKit"], swiftSettings: v5),
     ]
 )

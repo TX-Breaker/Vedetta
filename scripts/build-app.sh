@@ -49,8 +49,8 @@ codesign --verify --strict $APP
 echo "built $APP ($VERSION build $BUILD)"
 
 if [[ "${1:-}" == "--install" ]]; then
-  osascript -e 'tell application "Vedetta" to quit' >/dev/null 2>&1 || true
-  sleep 1
+  # Quit it only if it is running ("tell application" would otherwise launch it and connect to the devices).
+  if pgrep -xq Vedetta; then osascript -e 'tell application "Vedetta" to quit' >/dev/null 2>&1 || true; sleep 1; fi
   rm -rf /Applications/Vedetta.app
   ditto $APP /Applications/Vedetta.app
   /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Vedetta.app

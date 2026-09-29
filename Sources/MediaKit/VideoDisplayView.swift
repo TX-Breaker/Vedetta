@@ -20,7 +20,11 @@ public final class VideoDisplayView: NSView, VideoSink {
     /// Pan in normalized units (-1...1 of the extra area created by zoom).
     public var pan: CGPoint = .zero { didSet { applyTransform() } }
     public var fillsFrame: Bool = false {
-        didSet { displayLayer.videoGravity = fillsFrame ? .resizeAspectFill : .resizeAspect }
+        didSet { gravity = fillsFrame ? .resizeAspectFill : .resizeAspect }
+    }
+    /// .resizeAspect (black bars), .resizeAspectFill (crop) or .resize (stretch, nothing cropped).
+    public var gravity: AVLayerVideoGravity = .resizeAspect {
+        didSet { if displayLayer.videoGravity != gravity { displayLayer.videoGravity = gravity } }
     }
 
     public override init(frame frameRect: NSRect) {
@@ -37,6 +41,9 @@ public final class VideoDisplayView: NSView, VideoSink {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
+
+    /// Display only: clicks, drags, hover and gestures go to the SwiftUI views around it.
+    public override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     public override func layout() {
         super.layout()

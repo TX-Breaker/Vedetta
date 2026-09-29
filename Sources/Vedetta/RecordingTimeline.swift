@@ -19,6 +19,8 @@ struct RecordingTimeline: View {
     @Binding var center: Date
     @Binding var clip: ClosedRange<Date>?
     var clipMode: Bool
+    /// true: the plain wheel zooms around the pointer (Shift + wheel or sideways scrolls); false: the wheel scrolls.
+    var wheelZooms: Bool = true
     var onSeek: (Date) -> Void
 
     @State private var scrubTime: Date?
@@ -180,7 +182,8 @@ struct RecordingTimeline: View {
         case 14400...: return (1800, 300, 3600)
         case 3600...: return (600, 60, 1200)
         case 1200...: return (300, 60, 300)
-        default: return (60, 10, 120)
+        case 300...: return (60, 10, 120)
+        default: return (30, 5, 30)
         }
     }
 
@@ -240,12 +243,20 @@ struct RecordingTimeline: View {
                 return nil
             }
             let secondsPerPoint = span / Double(max(1, width))
-            if event.modifierFlags.contains(.command) {
-                zoom(by: event.scrollingDeltaY > 0 ? 0.85 : 1.18)
+            let sideways = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+            let shift = event.modifierFlags.contains(.shift)
+            let wantsZoom = wheelZooms ? (!sideways && !shift) : event.modifierFlags.contains(.command)
+            if wantsZoom {
+                // One notch of a mouse wheel = ±20 %; trackpads zoom smoothly.
+                let dy = Double(event.scrollingDeltaY)
+                guard dy != 0 else { return nil }
+                let factor = event.hasPreciseScrollingDeltas ? exp(-dy * 0.01) : (dy > 0 ? 0.8 : 1.25)
+                zoom(by: factor, anchorX: hoverX, width: width)
             } else {
-                let delta = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
+                // Shift + vertical wheel scrolls sideways (a mouse without a horizontal wheel).
+                let raw = sideways ? event.scrollingDeltaX : event.scrollingDeltaY
                 let factor = event.hasPreciseScrollingDeltas ? 1.0 : 12.0
-                pan(by: -Double(delta) * factor * secondsPerPoint)
+                pan(by: -Double(raw) * factor * secondsPerPoint)
             }
             return nil
         }
@@ -256,8 +267,16 @@ struct RecordingTimeline: View {
         monitor = nil
     }
 
-    private func zoom(by factor: Double) {
-        span = min(86400, max(300, span * factor))
+    /// Zooms keeping the time under the pointer still (or the centre, without a pointer).
+    private func zoom(by factor: Double, anchorX: CGFloat? = nil, width: CGFloat = 0) {
+        let old = visibleRange
+        let newSpan = min(86400, max(60, span * factor))
+        if let anchorX, width > 0 {
+            let f = Double(min(1, max(0, anchorX / width)))
+            let anchor = old.lowerBound.addingTimeInterval(f * span)
+            center = anchor.addingTimeInterval((0.5 - f) * newSpan)
+        }
+        span = newSpan
         lastUserScroll = Date()
         clampCenter()
     }

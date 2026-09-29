@@ -87,6 +87,7 @@ case "vigi":
                 let evs = try await c.events(channel: first.id, from: now.addingTimeInterval(-86400), to: now)
                 print("events 24h: \(evs.count) types=\(Set(evs.map(\.eventType)).sorted())")
             }
+            await c.logout()
         } catch { print("ERROR: \(error.localizedDescription)") }
         sem.signal()
     }
@@ -112,6 +113,7 @@ case "nvr":
             let r = try await DeviceConnector.connectNVR(address: String(hp[0]), httpPort: hp.count > 1 ? Int(hp[1])! : 443, rtspPort: Int(args[3]) ?? 554,
                                                          username: env["VEDETTA_USER"] ?? "admin", password: env["VEDETTA_PASS"] ?? "")
             print("name=\(r.device.name) model=\(r.device.model ?? "-") fw=\(r.device.firmware ?? "-") channels=\(r.device.channels.map(\.name)) warnings=\(r.warnings)")
+            await r.discardSession()
         } catch { print("ERROR: \(error.localizedDescription)") }
         exit(0)
     }

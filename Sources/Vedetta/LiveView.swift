@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import VedettaCore
+import NetKit
 import MediaKit
 import VedettaL10n
 
@@ -13,21 +14,24 @@ struct LiveView: View {
         GeometryReader { geo in
             let frames = model.layout.grid.frames
             let gap: CGFloat = 4
+            let grid = LiveGridGeometry(size: geo.size, frames: frames, gap: gap)
             ZStack(alignment: .topLeading) {
                 Color.black
-                ForEach(Array(frames.enumerated()), id: \.offset) { i, f in
-                    let rect = CGRect(x: f.minX * geo.size.width + gap / 2, y: f.minY * geo.size.height + gap / 2,
-                                      width: f.width * geo.size.width - gap, height: f.height * geo.size.height - gap)
+                ForEach(Array(frames.enumerated()), id: \.offset) { i, _ in
+                    let rect = grid.rect(i)
                     TileSlot(tile: i, size: rect.size)
                         .frame(width: max(1, rect.width), height: max(1, rect.height))
                         .offset(x: rect.minX, y: rect.minY)
                 }
+                if let drag = model.tileDrag { dragOverlay(drag, grid: grid) }
             }
+            .coordinateSpace(.named(LiveGridGeometry.space))
+            .environment(\.liveGrid, grid)
             .id(model.reloadToken)
         }
         .padding(4)
         .background(Color.black)
-        .backgroundExtensionEffect()
+        // No background extension: the grid must stay entirely below the toolbar (top labels and buttons visible).
         .navigationTitle(L("Live"))
         .toolbar { LiveToolbar() }
         .onKeyPress(characters: .decimalDigits) { press in
@@ -35,6 +39,56 @@ struct LiveView: View {
             model.selectedTile = n - 1
             return .handled
         }
+    }
+}
+
+extension LiveView {
+    /// Where a dragged tile will land: highlighted target and the camera name following the pointer.
+    @ViewBuilder
+    func dragOverlay(_ drag: AppModel.TileDrag, grid: LiveGridGeometry) -> some View {
+        if let target = grid.index(at: drag.location), target != drag.from {
+            let r = grid.rect(target)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Theme.accent, lineWidth: 3)
+                .background(Theme.accent.opacity(0.15), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(width: r.width, height: r.height)
+                .offset(x: r.minX, y: r.minY)
+                .allowsHitTesting(false)
+        }
+        Label(drag.name, systemImage: "video.fill")
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .glassEffect(.regular.tint(Theme.accent.opacity(0.4)), in: .capsule)
+            .fixedSize()
+            .position(x: drag.location.x, y: drag.location.y - 24)
+            .allowsHitTesting(false)
+    }
+}
+
+/// Tile rectangles of the live grid (shared by the grid and the tiles, for drag and drop between tiles).
+struct LiveGridGeometry: Equatable {
+    static let space = "liveGrid"
+    var size: CGSize = .zero
+    var frames: [CGRect] = []
+    var gap: CGFloat = 4
+
+    func rect(_ i: Int) -> CGRect {
+        let f = frames[i]
+        return CGRect(x: f.minX * size.width + gap / 2, y: f.minY * size.height + gap / 2,
+                      width: f.width * size.width - gap, height: f.height * size.height - gap)
+    }
+
+    func index(at p: CGPoint) -> Int? {
+        frames.indices.first { rect($0).insetBy(dx: -gap, dy: -gap).contains(p) }
+    }
+}
+
+private struct LiveGridKey: EnvironmentKey { static let defaultValue: LiveGridGeometry? = nil }
+extension EnvironmentValues {
+    var liveGrid: LiveGridGeometry? {
+        get { self[LiveGridKey.self] }
+        set { self[LiveGridKey.self] = newValue }
     }
 }
 
@@ -82,7 +136,14 @@ struct LiveToolbar: ToolbarContent {
                     ForEach(StreamQuality.allCases) { q in Text(q.label).tag(q) }
                 }
                 .pickerStyle(.inline)
-                Toggle(L("Fill the tiles"), isOn: $model.settings.fillTiles)
+                Picker(L("Picture in the tiles"), selection: $model.settings.tileFit) {
+                    ForEach(TileFit.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.inline)
+                Picker(L("Camera names"), selection: $model.settings.tileLabels) {
+                    ForEach(TileLabelMode.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.inline)
                 Toggle(L("Show video information"), isOn: $model.settings.showStreamInfo)
             } label: {
                 Label(L("Quality"), systemImage: "slider.horizontal.3")
@@ -212,7 +273,8 @@ final class TileController {
         if let s = stream, s.key == key, s.url == url { return }
         if let old = stream { old.detach(view); pool.release(old) }
         view.clear()
-        let s = pool.acquire(key: key, url: url, credentials: device.credentials, title: channel.name)
+        let s = pool.acquire(key: key, url: url, credentials: device.credentials, title: channel.name,
+                             accessGuard: DeviceClients.shared.accessGuard(for: device))
         s.attach(view)
         stream = s
     }
@@ -235,6 +297,7 @@ struct VideoTile: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.liveGrid) private var grid
     @State private var controller = TileController()
     @State private var hover = false
     @State private var zoom: CGFloat = 1
@@ -248,7 +311,9 @@ struct VideoTile: View {
         let status = controller.stream?.status
         ZStack {
             VideoSurface(view: controller.view)
-            if let status, !status.isPlaying {
+            if model.accessState(device).needsUser {
+                blockedOverlay(model.accessState(device))
+            } else if let status, !status.isPlaying {
                 statusOverlay(status)
             }
             overlays(status)
@@ -264,15 +329,26 @@ struct VideoTile: View {
         .onHoverChange($hover)
         .gesture(magnify)
         .simultaneousGesture(panGesture)
+        .simultaneousGesture(moveGesture)
+        .opacity(model.tileDrag?.from == tile && allowsLayoutActions ? 0.45 : 1)
         .onTapGesture(count: 2) { if allowsLayoutActions { withAnimation(.snappy) { model.toggleSingle(tile: tile) } } }
         .onAppear { rebind() }
         .onDisappear { controller.unbind() }
         .onChange(of: size.width) { _, _ in rebind() }
-        .onChange(of: model.settings.fillTiles, initial: true) { _, v in controller.view.fillsFrame = v }
+        .onChange(of: model.accessState(device).needsUser) { _, _ in rebind() }
+        .onChange(of: model.settings.tileFit, initial: true) { _, v in
+            switch v {
+            case .fit: controller.view.gravity = .resizeAspect
+            case .fill: controller.view.gravity = .resizeAspectFill
+            case .stretch: controller.view.gravity = .resize
+            }
+        }
         .contextMenu { contextMenu }
     }
 
     private func rebind() {
+        // Waiting for the user (refused, locked, signed out): no stream with credentials that do not work.
+        guard !model.accessState(device).needsUser else { controller.unbind(); return }
         let newKind = model.streamKind(forTileWidth: size.width)
         if controller.stream == nil || newKind != kind {
             kind = newKind
@@ -287,10 +363,10 @@ struct VideoTile: View {
         VStack(spacing: 0) {
             HStack(alignment: .top) {
                 HStack(spacing: 6) {
-                    StatusDot(color: dotColor(status), pulsing: status?.isRecording == true)
+                    StatusDot(color: dotColor(status), pulsing: recording != nil)
                     Text(channel.name).font(.system(size: 12, weight: .semibold)).lineLimit(1)
-                    if status?.isRecording == true {
-                        RecordingBadge(start: status?.recordingStarted)
+                    if let recording {
+                        RecordingBadge(start: recording.started)
                     }
                     if zoom > 1.01 {
                         Text("\(String(format: "%.1f", zoom))×").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
@@ -299,7 +375,7 @@ struct VideoTile: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .glassEffect(.clear, in: .capsule)
-                .opacity(hover || size.width > 360 || status?.isRecording == true ? 1 : 0.0)
+                .opacity(labelVisible ? 1 : 0)
 
                 Spacer(minLength: 8)
 
@@ -313,9 +389,9 @@ struct VideoTile: View {
                                 }
                             }
                             OverlayButton(symbol: "camera.fill", help: L("Snapshot")) { snapshot() }
-                            OverlayButton(symbol: status?.isRecording == true ? "stop.circle.fill" : "record.circle",
-                                          help: status?.isRecording == true ? L("Stop recording") : L("Record on this Mac"),
-                                          tint: Theme.recording, active: status?.isRecording == true) { toggleRecording() }
+                            OverlayButton(symbol: recording != nil ? "stop.circle.fill" : "record.circle",
+                                          help: recording != nil ? L("Stop recording") : L("Record on this Mac (full quality)"),
+                                          tint: Theme.recording, active: recording != nil) { toggleRecording() }
                             if channel.hasPTZ {
                                 OverlayButton(symbol: "arrow.up.and.down.and.arrow.left.and.right", help: L("PTZ control"), active: showPTZ) {
                                     withAnimation(.snappy) { showPTZ.toggle() }
@@ -357,7 +433,11 @@ struct VideoTile: View {
             case .failed(let msg):
                 Image(systemName: "exclamationmark.triangle.fill").font(.title2).foregroundStyle(.orange)
                 Text(msg).font(.callout).multilineTextAlignment(.center)
-                Button(L("Retry")) { controller.unbind(); rebind() }.buttonStyle(.glass)
+                if model.accessState(device).needsUser {
+                    Button(L("Sign In…")) { model.signIn = AppModel.SignInRequest(deviceID: device.id) }.buttonStyle(.glass)
+                } else {
+                    Button(L("Retry")) { controller.stream?.retryNow() }.buttonStyle(.glass)
+                }
             case .reconnecting(let msg):
                 ProgressView().controlSize(.small)
                 Text(msg).font(.caption).multilineTextAlignment(.center).foregroundStyle(.secondary)
@@ -373,9 +453,32 @@ struct VideoTile: View {
         .frame(maxWidth: min(320, size.width - 20))
     }
 
+    private func blockedOverlay(_ state: AccessState) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: state == .signedOut ? "rectangle.portrait.and.arrow.right" : "lock.trianglebadge.exclamationmark")
+                .font(.title2).foregroundStyle(.orange)
+            Text(state.message).font(.callout).multilineTextAlignment(.center)
+            Button(L("Sign In…")) { model.signIn = AppModel.SignInRequest(deviceID: device.id) }.buttonStyle(.glass)
+        }
+        .foregroundStyle(.white)
+        .padding(16)
+        .frame(maxWidth: min(320, size.width - 20))
+    }
+
+    private var recording: AppModel.LiveRecording? { model.liveRecordings[channel.id] }
+
+    private var labelVisible: Bool {
+        if recording != nil { return true }
+        switch model.settings.tileLabels {
+        case .always: return true
+        case .hover: return hover
+        case .never: return false
+        }
+    }
+
     private func dotColor(_ s: StreamStatus?) -> Color {
         guard let s else { return .gray }
-        if s.isRecording { return Theme.recording }
+        if recording != nil { return Theme.recording }
         switch s.phase {
         case .playing: return .green
         case .failed: return .orange
@@ -391,34 +494,29 @@ struct VideoTile: View {
 
     // MARK: Actions
 
+    /// Always at the camera's full resolution (main stream), even when the tile shows the light stream.
     private func snapshot() {
-        if let img = controller.view.currentImage() {
-            model.saveSnapshot(img, channel: channel)
-            return
-        }
-        controller.stream?.snapshot { img in
-            DispatchQueue.main.async { model.saveSnapshot(img, channel: channel) }
-        }
+        let current = controller.view.currentImage()
+        model.saveFullQualitySnapshot(channel: channel, device: device, current: current, currentIsMain: kind == .main)
     }
 
+    /// Records the main (full quality) stream, whatever quality the tile is showing.
     private func toggleRecording() {
-        guard let s = controller.stream else { return }
-        if s.status.isRecording {
-            s.stopRecording { url, err in
-                DispatchQueue.main.async {
-                    if let url { model.toast(.success, L("Recording saved"), channel.name, file: url) }
-                    else if let err { model.toast(.error, L("Recording not saved"), err.localizedDescription) }
-                }
+        model.toggleLiveRecording(channel: channel, device: device)
+    }
+
+    /// Drag a tile onto another one to swap the two cameras (or move it to an empty tile).
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .named(LiveGridGeometry.space))
+            .onChanged { v in
+                guard allowsLayoutActions, tile >= 0, grid != nil, zoom <= 1.01 else { return }
+                model.tileDrag = AppModel.TileDrag(from: tile, channelID: channel.id, name: channel.name, location: v.location)
             }
-        } else {
-            let url = model.recordingURL(for: channel)
-            s.startRecording(to: url) { err in
-                DispatchQueue.main.async {
-                    if let err { model.toast(.error, L("Cannot record"), err.localizedDescription) }
-                    else { model.toast(.info, L("Recording started"), L("%@ — the file is being saved on this Mac", channel.name)) }
-                }
+            .onEnded { v in
+                defer { model.tileDrag = nil }
+                guard model.tileDrag != nil, let target = grid?.index(at: v.location), target != tile else { return }
+                withAnimation(.snappy) { model.assign(channelID: channel.id, toTile: target) }
             }
-        }
     }
 
     // MARK: Digital zoom
@@ -456,7 +554,7 @@ struct VideoTile: View {
     @ViewBuilder
     private var contextMenu: some View {
         Button(L("Snapshot")) { snapshot() }
-        Button(controller.stream?.status.isRecording == true ? L("Stop recording") : L("Record on this Mac")) { toggleRecording() }
+        Button(recording != nil ? L("Stop recording") : L("Record on this Mac (full quality)")) { toggleRecording() }
         if channel.supportsPlayback {
             Button(L("Review the last hour")) { model.openPlayback(channelIDs: [channel.id], at: Date().addingTimeInterval(-3600)) }
         }

@@ -1,7 +1,9 @@
 import Foundation
 import AppKit
 import AVFoundation
+import ImageIO
 import VedettaCore
+import NetKit
 import MediaKit
 import VedettaL10n
 
@@ -15,6 +17,9 @@ final class SelfTest {
     private var results: [Result] = []
     private var hangs: [String] = []
     private var maxMainLag: Double = 0
+    /// What the test is doing (reported with UI freezes).
+    private var phase = "start"
+    private var maxLagPhase = ""
     private let out: URL
     private let work: URL
     private let started = Date()
@@ -37,6 +42,7 @@ final class SelfTest {
     // MARK: Helpers
 
     private func check(_ name: String, _ ok: Bool, _ detail: String = "") {
+        phase = "after " + name
         results.append(Result(name: name, ok: ok, detail: detail, seconds: Date().timeIntervalSince(started)))
         NSLog("SELFTEST %@ %@ %@", ok ? "PASS" : "FAIL", name, detail)
     }
@@ -72,8 +78,8 @@ final class SelfTest {
                 let lag = now - last - 0.2
                 last = now
                 guard let self else { return }
-                self.maxMainLag = max(self.maxMainLag, lag)
-                if lag > 1.5 { self.hangs.append(String(format: "freeze of %.1fs at t=%.0fs", lag, Date().timeIntervalSince(self.started))) }
+                if lag > self.maxMainLag { self.maxMainLag = lag; self.maxLagPhase = self.phase }
+                if lag > 1.5 { self.hangs.append(String(format: "freeze of %.1fs at t=%.0fs (%@)", lag, Date().timeIntervalSince(self.started), self.phase)) }
             }
         }
     }
@@ -98,16 +104,23 @@ final class SelfTest {
         guard ready, let dev = model.devices.first else { return finish(rss0: rss0) }
         let online = dev.visibleChannels.filter(\.isOnline)
         check("channels-found", !online.isEmpty, "\(dev.channels.count) channels, \(online.count) online")
+        if env["VEDETTA_SELFTEST_SCENARIO"] == "resilience" {
+            await runResilience(dev: dev)
+            return finish(rss0: rss0)
+        }
 
         await testLive(dev: dev, online: online)
+        await testLiveUI(dev: dev)
         await testSections()
         if dev.supportsPlayback {
             await testIndex(dev: dev)
             await testPlayback(dev: dev)
+            await testPlaybackKeys()
             await testExports(dev: dev)
         }
         await testDeviceOps(dev: dev)
         await testConnectForm(dev: dev)
+        await testSettingsPersistence(dev: dev)
         await testSuspend()
         await testReconnect()
         model.section = .live
@@ -199,6 +212,185 @@ final class SelfTest {
         check("live-audio-toggle", stream.status.isPlaying)
     }
 
+    // MARK: Live view interaction and full-quality capture
+
+    private func videoViews(in v: NSView) -> [VideoDisplayView] {
+        (v as? VideoDisplayView).map { [$0] } ?? v.subviews.flatMap(videoViews)
+    }
+
+    private var mainWindow: NSWindow? {
+        NSApp.windows.first { w in w.isVisible && w.contentView.map { !videoViews(in: $0).isEmpty } == true }
+            ?? NSApp.windows.first { $0.isVisible && $0.canBecomeMain }
+    }
+
+    private func post(_ e: NSEvent?) { if let e { NSApp.postEvent(e, atStart: false) } }
+
+    private func mouse(_ type: NSEvent.EventType, _ p: NSPoint, in w: NSWindow) {
+        post(NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1))
+    }
+
+    private func key(_ chars: String, code: UInt16, shift: Bool = false, in w: NSWindow) {
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            post(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: shift ? [.shift] : [],
+                                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber, context: nil,
+                                  characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code))
+        }
+    }
+
+    private func newestFile(in dir: URL, ext: String, after date: Date) -> URL? {
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        return files.filter { $0.pathExtension == ext }
+            .compactMap { u -> (URL, Date)? in
+                guard let d = (try? u.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate, d >= date else { return nil }
+                return (u, d)
+            }
+            .max { $0.1 < $1.1 }?.0
+    }
+
+    private func testLiveUI(dev: Device) async {
+        model.section = .live
+        model.setGrid(.four)
+        model.layout.page = 0
+        await sleep(3)
+        guard let w = mainWindow else { return check("live-window", false, "no window") }
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // 1. The grid stays below the toolbar (the top tiles' names and buttons are visible).
+        let area = w.contentLayoutRect
+        let frames = videoViews(in: w.contentView!).map { $0.convert($0.bounds, to: nil) }.filter { $0.width > 20 }
+        let hidden = frames.filter { $0.maxY > area.maxY + 1 }
+        check("live-tiles-below-toolbar", !frames.isEmpty && hidden.isEmpty,
+              "\(frames.count) tiles, content top \(Int(area.maxY)), highest tile top \(Int(frames.map(\.maxY).max() ?? 0))")
+
+        // 2. Drag a tile onto another with the mouse (real mouse events): the camera moves there.
+        if let t0 = model.channelID(atTile: 0),
+           let a = frames.min(by: { ($0.minX - $0.maxY) < ($1.minX - $1.maxY) }),
+           let b = frames.max(by: { ($0.minX - $0.maxY) < ($1.minX - $1.maxY) }) {
+            let p0 = NSPoint(x: a.midX, y: a.midY), p3 = NSPoint(x: b.midX, y: b.midY)
+            var sawDrag = false
+            mouse(.leftMouseDown, p0, in: w)
+            await sleep(0.1)
+            for i in 1...15 {
+                let f = CGFloat(i) / 15
+                mouse(.leftMouseDragged, NSPoint(x: p0.x + (p3.x - p0.x) * f, y: p0.y + (p3.y - p0.y) * f), in: w)
+                await sleep(0.05)
+                if model.tileDrag != nil { sawDrag = true }
+            }
+            mouse(.leftMouseUp, p3, in: w)
+            let moved = await waitUntil(3) { self.model.channelID(atTile: 0) != t0 && self.model.layout.slots.contains(t0) }
+            let target = model.layout.slots.firstIndex(of: t0).map(String.init) ?? "-"
+            check("live-tile-drag", moved, "gesture \(sawDrag ? "seen" : "not seen"), camera now in tile \(target)")
+            if moved { model.assign(channelID: t0, toTile: 0) }
+        }
+
+        // 3. Labels: always / pointer / never are stored.
+        let savedLabels = model.settings.tileLabels
+        model.settings.tileLabels = .never
+        model.settings.tileLabels = savedLabels
+        check("live-label-modes", model.settings.tileLabels == savedLabels)
+
+        // 4. Snapshot and recording at full quality while the tiles show the light stream.
+        let quality = model.settings.liveQuality
+        model.settings.liveQuality = .low
+        defer { model.settings.liveQuality = quality }
+        await sleep(4)
+        guard let ch = dev.visibleChannels.first(where: { $0.isOnline }) else { return }
+        let sub = model.pool.existing(key: AppModel.streamKey(dev, ch, .sub))?.status.resolution ?? .zero
+        let t = Date().addingTimeInterval(-1)
+        model.saveFullQualitySnapshot(channel: ch, device: dev, current: nil, currentIsMain: false)
+        let shot = await waitUntilValue(15) { self.newestFile(in: self.model.settings.snapshotsURL, ext: "jpg", after: t) }
+        var shotSize = CGSize.zero
+        if let shot, let src = CGImageSourceCreateWithURL(shot as CFURL, nil),
+           let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] {
+            shotSize = CGSize(width: props[kCGImagePropertyPixelWidth] as? Int ?? 0, height: props[kCGImagePropertyPixelHeight] as? Int ?? 0)
+        }
+        check("live-snapshot-full-quality", shotSize.width > max(sub.width, 700),
+              "snapshot \(Int(shotSize.width))×\(Int(shotSize.height)), tile stream \(Int(sub.width))×\(Int(sub.height))")
+
+        let t2 = Date().addingTimeInterval(-1)
+        model.toggleLiveRecording(channel: ch, device: dev)
+        let started = await waitUntil(20) { self.model.liveRecordings[ch.id]?.started != nil }
+        await sleep(5)
+        model.toggleLiveRecording(channel: ch, device: dev)
+        let file = await waitUntilValue(15) { self.newestFile(in: self.model.settings.recordingsURL, ext: "mp4", after: t2) }
+        await sleep(1)
+        var recSize = CGSize.zero
+        var recDur = 0.0
+        if let file {
+            let asset = AVURLAsset(url: file)
+            if let track = try? await asset.loadTracks(withMediaType: .video).first, let size = try? await track.load(.naturalSize) { recSize = size }
+            recDur = await duration(of: file)
+        }
+        check("live-recording-full-quality", started && recSize.width > max(sub.width, 700) && recDur >= 3,
+              String(format: "recording %d×%d, %.1f s, tile stream %d×%d", Int(recSize.width), Int(recSize.height), recDur, Int(sub.width), Int(sub.height)))
+        await sleep(6)
+        let released = model.pool.existing(key: AppModel.streamKey(dev, ch, .main)) == nil || model.layout.grid == .one
+        check("live-hd-stream-released", released, "main stream closed after the capture")
+    }
+
+    private func waitUntilValue<T>(_ timeout: Double, _ get: () -> T?) async -> T? {
+        let end = Date().addingTimeInterval(timeout)
+        while Date() < end {
+            if let v = get() { return v }
+            await sleep(0.25)
+        }
+        return get()
+    }
+
+    /// Recordings keyboard shortcuts, sent as real key presses.
+    private func testPlaybackKeys() async {
+        model.section = .playback
+        let ready = await waitUntil(25) { (self.model.activePlayback?.isPlaying ?? false) && !(self.model.activePlayback?.isBuffering ?? true) }
+        guard ready, let s = model.activePlayback, let w = mainWindow else { return check("playback-keys", false, "playback not ready") }
+        w.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        await sleep(1)
+        key(" ", code: 49, in: w)
+        let paused = await waitUntil(3) { !s.isPlaying }
+        key(" ", code: 49, in: w)
+        let playing = await waitUntil(3) { s.isPlaying }
+        let before = s.currentTime
+        key("", code: 124, in: w)                     // →: +10 s
+        let jumped = await waitUntil(8) { s.currentTime.timeIntervalSince(before) >= 8 }
+        let t = Date().addingTimeInterval(-1)
+        key("s", code: 1, in: w)
+        let shot = await waitUntilValue(8) { self.newestFile(in: self.model.settings.snapshotsURL, ext: "jpg", after: t) }
+        check("playback-keys", paused && playing && jumped && shot != nil,
+              "space pause \(paused), space play \(playing), → +10 s \(jumped), S snapshot \(shot != nil)")
+        model.section = .live
+        await sleep(2)
+    }
+
+    /// Settings survive: saved to disk as they change, readable by older/newer versions, exported without passwords.
+    private func testSettingsPersistence(dev: Device) async {
+        let saved = model.settings
+        model.settings.tileLabels = .never
+        model.settings.tileFit = .stretch
+        model.settings.exportAudio = false
+        JSONStore<AppSettings>.flushAll()
+        let onDisk = JSONStore<AppSettings>(filename: "settings.json").load()
+        check("settings-saved-to-disk", onDisk?.tileLabels == .never && onDisk?.tileFit == .stretch && onDisk?.exportAudio == false)
+        model.settings = saved
+
+        let url = work.appendingPathComponent("vedetta-settings.json")
+        do {
+            try model.exportSettings(to: url)
+            let data = try Data(contentsOf: url)
+            let text = String(decoding: data, as: UTF8.self)
+            let pass = CredentialCache.shared.password(for: dev.id) ?? "-"
+            let b = try SettingsBackup.decode(data)
+            check("settings-export", b.devices.count == model.devices.count && b.devices.first?.channels.count == dev.channels.count
+                  && !text.contains(pass), "\(b.devices.count) devices, \(data.count) bytes, no password")
+            model.importSettings(b)
+            let back = await waitUntil(40) { self.model.pool.activeStreams.contains { $0.status.isPlaying } && self.model.devices.count == b.devices.count }
+            check("settings-import", back, "devices \(model.devices.count), streams playing \(back)")
+        } catch {
+            check("settings-export", false, error.localizedDescription)
+        }
+    }
+
     private func testSections() async {
         for s in AppSection.allCases {
             model.section = s
@@ -269,6 +461,21 @@ final class SelfTest {
         check("export-complete", done && job?.state == .completed && d >= 15,
               "state \(job?.state.rawValue ?? "-") duration \(String(format: "%.1f", d)) \(job?.message ?? "")")
 
+        // Without audio: the MP4 must have no sound track (the first export, with audio, has one if the stream does).
+        let silent = model.exports.enqueue(device: dev, channel: ch, start: end.addingTimeInterval(-40), end: end.addingTimeInterval(-25),
+                                           folder: work, includeAudio: false)
+        let silentDone = await waitUntil(90) { self.model.exports.jobs.first { $0.id == silent.id }?.state == .completed }
+        var silentAudio = -1, withAudio = -1
+        if silentDone {
+            silentAudio = (try? await AVURLAsset(url: silent.fileURL).loadTracks(withMediaType: .audio).count) ?? -1
+            if let first = model.exports.jobs.first(where: { $0.id == rec.id }), first.state == .completed {
+                withAudio = (try? await AVURLAsset(url: first.fileURL).loadTracks(withMediaType: .audio).count) ?? -1
+            }
+        }
+        check("export-audio-choice", silentDone && silentAudio == 0 && withAudio != 0,
+              "without audio: \(silentAudio) sound tracks; with audio: \(withAudio)")
+        model.exports.remove(silent.id)
+
         let rec2 = model.exports.enqueue(device: dev, channel: ch, start: end.addingTimeInterval(-120), end: end, folder: work)
         await sleep(6)
         model.exports.cancel(rec2.id)
@@ -328,6 +535,7 @@ final class SelfTest {
         check("form-can-connect", good.canConnect)
         let r = await good.connect()
         check("form-connect", r != nil && r?.device.channels.count == dev.channels.count, good.error ?? "\(r?.device.channels.count ?? 0) channels")
+        await r?.discardSession()
         let bad = form(password: "sbagliata")
         let rb = await bad.connect()
         check("form-wrong-password", rb == nil && (bad.error ?? "").lowercased().contains(L("Password").lowercased()), bad.error ?? "")
@@ -341,6 +549,7 @@ final class SelfTest {
         let re = await edit.connect()
         check("form-edit-keeps-names", re?.device.channels.first?.name == "Custom name" && re?.device.id == dev.id,
               edit.error ?? (re?.device.channels.first?.name ?? "-"))
+        await re?.discardSession()
     }
 
     /// CPU saving: streams stop when nothing is visible and come back afterwards.
@@ -366,15 +575,163 @@ final class SelfTest {
         check("live-reconnect", before > 0 && dropped && back, "before \(before), dropped \(dropped), back \(back)")
     }
 
+    // MARK: Account protection (recorder offline, refused password, locked user, sign out, switch user)
+
+    private func mock(_ command: [String: Any]? = nil) async -> [String: Any] {
+        guard let base = env["VEDETTA_MOCK_CONTROL"], let url = URL(string: base + (command == nil ? "/stats" : "/control")) else { return [:] }
+        var req = URLRequest(url: url, timeoutInterval: 5)
+        if let command { req.httpMethod = "POST"; req.httpBody = try? JSONSerialization.data(withJSONObject: command) }
+        guard let (data, _) = try? await URLSession.shared.data(for: req),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    private func n(_ d: [String: Any], _ k: String) -> Int { d[k] as? Int ?? -1 }
+    private func list(_ d: [String: Any], _ k: String) -> String { (d[k] as? [String])?.joined(separator: ",") ?? "-" }
+
+    /// Asks the regression script to stop/start the video server (the recorder's RTSP side).
+    private func video(_ command: String) {
+        guard let marker = env["VEDETTA_SELFTEST_RESTART_MARKER"] else { return }
+        FileManager.default.createFile(atPath: marker, contents: Data(command.utf8))
+    }
+
+    private func playing() -> Int { model.pool.activeStreams.filter { $0.status.isPlaying }.count }
+    private func current(_ dev: Device) -> Device { model.devices.first { $0.id == dev.id } ?? dev }
+    private func state(_ dev: Device) -> AccessState { model.accessState(dev) }
+    private func isRejected(_ s: AccessState) -> Bool { if case .rejected = s { return true } else { return false } }
+    private func isLocked(_ s: AccessState) -> Bool { if case .locked = s { return true } else { return false } }
+
+    private func runResilience(dev: Device) async {
+        model.section = .live
+        let ready = await waitUntil(45) { self.playing() > 0 && self.state(dev) == .online }
+        let s0 = await mock()
+        check("res-baseline", ready && !s0.isEmpty, "playing \(playing()), \(state(dev)), mock \(s0.isEmpty ? "unreachable" : "ok")")
+        guard ready, !s0.isEmpty else { return }
+        let logins0 = n(s0, "logins")
+
+        // 1. The recorder stops answering (API and video) for two minutes.
+        let t0 = Date()
+        _ = await mock(["offline": true])
+        video("stop")
+        let off = await waitUntil(60) { self.state(dev).isOffline }
+        let tDetect = Date().timeIntervalSince(t0)
+        let t1 = Date()
+        await model.index.loadDay(device: dev, channels: dev.visibleChannels, day: Date(), force: true)
+        let fast = Date().timeIntervalSince(t1)
+        check("res-offline-detected", off && fast < 3,
+              String(format: "offline after %.0f s; timeline request answered in %.1f s: %@", tDetect, fast, model.index.error ?? "-"))
+        let left = 120 - Date().timeIntervalSince(t0)
+        if left > 0 { await sleep(left) }
+        let s1 = await mock()
+        check("res-offline-no-logins", n(s1, "logins") == logins0 && n(s1, "logins_while_offline") == 0,
+              "logins \(logins0) → \(n(s1, "logins")), logins sent while offline \(n(s1, "logins_while_offline")), unauthenticated checks \(n(s1, "requests_while_offline"))")
+        check("res-offline-banner", state(dev).isOffline && !model.everyDeviceNeedsSignIn, state(dev).message)
+        _ = await mock(["offline": false])
+        video("start")
+        let tBack = Date()
+        let back = await waitUntil(170) { self.state(dev) == .online && self.playing() > 0 }
+        await model.index.loadDay(device: dev, channels: dev.visibleChannels, day: Date(), force: true)
+        let s2 = await mock()
+        check("res-offline-recovery", back && n(s2, "logins") == logins0 && model.index.error == nil,
+              String(format: "video back %.0f s after the recorder; logins %d → %d (session reused)", Date().timeIntervalSince(tBack), logins0, n(s2, "logins")))
+
+        // 2. The password was changed on the recorder: one refused login, then nothing.
+        let b2 = await mock(["password": "changed-on-the-recorder", "expire": true])
+        await withTaskGroup(of: Void.self) { g in
+            for _ in 0..<5 {
+                g.addTask { @MainActor in await self.model.index.loadDay(device: dev, channels: dev.visibleChannels, day: Date(), force: true) }
+            }
+        }
+        let rejected = await waitUntil(20) { self.isRejected(self.state(dev)) }
+        await sleep(30)
+        let a2 = await mock()
+        check("res-wrong-password-once", rejected && n(a2, "failed") - n(b2, "failed") == 1 && a2["locked"] as? Bool == false,
+              "refused logins \(n(a2, "failed") - n(b2, "failed")), locked \(a2["locked"] ?? "-"), buzzer \(n(a2, "buzzer") - n(b2, "buzzer"))")
+        check("res-wrong-password-signin-screen", model.everyDeviceNeedsSignIn && playing() == 0, state(dev).message)
+
+        // 3. The user is locked: stop until the unlock time the recorder gave, then one attempt.
+        let b3 = await mock(["password": "", "lock": 90])
+        model.retryAccess(current(dev))
+        let locked = await waitUntil(20) { self.isLocked(self.state(dev)) }
+        await sleep(40)
+        let m3 = await mock()
+        check("res-locked-stops", locked && n(m3, "logins") - n(b3, "logins") == 1,
+              "\(state(dev).message) — logins while locked \(n(m3, "logins") - n(b3, "logins"))")
+        let unlocked = await waitUntil(120) { self.state(dev) == .online && self.playing() > 0 }
+        let a3 = await mock()
+        check("res-locked-resumes", unlocked && n(a3, "locked_replies") - n(b3, "locked_replies") == 1 && n(a3, "failed") == n(b3, "failed"),
+              "online again: \(unlocked), locked replies \(n(a3, "locked_replies") - n(b3, "locked_replies"))")
+
+        // 4. Sign out while the recorder is unreachable: local only, immediately.
+        _ = await mock(["offline": true])
+        video("stop")
+        let off4 = await waitUntil(60) { self.state(dev).isOffline }
+        let t4 = Date()
+        await model.signOut(current(dev))
+        let dt = Date().timeIntervalSince(t4)
+        let b4 = await mock()
+        await sleep(12)
+        let a4 = await mock()
+        check("res-signout-offline", off4 && dt < 3 && n(a4, "logouts_while_offline") == 0 && n(a4, "logins_while_offline") == 0
+              && CredentialCache.shared.password(for: dev.id) == nil && state(dev) == .signedOut && model.everyDeviceNeedsSignIn,
+              String(format: "done in %.1f s, nothing sent (logout %d, login %d), sign-in screen %@", dt, n(a4, "logouts_while_offline"),
+                     n(a4, "logins_while_offline"), model.everyDeviceNeedsSignIn ? "shown" : "missing"))
+        check("res-signout-stops-retries", n(a4, "requests_while_offline") == n(b4, "requests_while_offline") && model.pool.activeStreams.isEmpty,
+              "requests after sign out: \(n(a4, "requests_while_offline") - n(b4, "requests_while_offline"))")
+        _ = await mock(["offline": false])
+        video("start")
+        await sleep(6)
+
+        // 5. Sign in again, then switch user while the video is playing.
+        let userA = env["VEDETTA_USER"] ?? "", passA = env["VEDETTA_PASS"] ?? ""
+        let userB = env["VEDETTA_VUSER"] ?? "", passB = env["VEDETTA_VPASS"] ?? ""
+        let f = ConnectFormModel(editing: current(dev))
+        f.username = userA
+        f.password = passA
+        let r = await f.connect()
+        if let r { model.addOrUpdate(r, password: passA) }
+        let playingA = await waitUntil(45) { self.playing() > 0 }
+        let sA = await mock()
+        // A session open when signing out offline cannot be closed (the recorder lets it expire): count from here.
+        let base = (b4["sessions"] as? [String]) ?? []
+        func sessions(_ d: [String: Any]) -> [String] { (d["sessions"] as? [String]) ?? ["?"] }
+        check("res-signin", r != nil && playingA && sessions(sA) == (base + [userA]).sorted(),
+              f.error ?? "sessions [\(list(sA, "sessions"))], left by the offline sign out [\(base.joined(separator: ","))]")
+
+        await model.signOut(current(dev), switchUser: true)
+        let stopped = await waitUntil(5) { self.playing() == 0 && self.model.pool.activeStreams.isEmpty }
+        let sMid = await mock()
+        check("res-switch-signs-out-first", stopped && n(sMid, "logouts") == n(sA, "logouts") + 1 && sessions(sMid) == base.sorted()
+              && model.signIn?.clearUser == true && CredentialCache.shared.password(for: dev.id) == nil,
+              "logouts +\(n(sMid, "logouts") - n(sA, "logouts")), sessions [\(list(sMid, "sessions"))], user field cleared \(model.signIn?.clearUser == true)")
+        let g = ConnectFormModel(editing: current(dev))
+        g.username = userB
+        g.password = passB
+        let r2 = await g.connect()
+        if let r2 { model.addOrUpdate(r2, password: passB) }
+        let playingB = await waitUntil(45) { self.playing() > 0 }
+        let sB = await mock()
+        check("res-switch-new-user", r2 != nil && playingB && sessions(sB) == (base + [userB]).sorted() && n(sB, "failed") == n(sA, "failed")
+              && current(dev).username == userB,
+              g.error ?? "sessions [\(list(sB, "sessions"))], user \(current(dev).username), logins [\(list(sB, "login_log"))]")
+        let log = AccessLog.shared.lines()
+        check("res-connection-log", log.contains { $0.contains("\trejected\t") } && log.contains { $0.contains("probe (no password)") } && !log.contains { $0.contains(passA) || $0.contains(passB) },
+              "\(log.count) lines, no passwords")
+    }
+
     private func finish(rss0: Double) {
         let rss1 = residentMB()
-        check("no-ui-hangs", hangs.isEmpty, hangs.isEmpty ? String(format: "max main-thread lag %.2fs", maxMainLag) : hangs.joined(separator: ", "))
+        check("no-ui-hangs", hangs.isEmpty, hangs.isEmpty ? String(format: "max main-thread lag %.2fs (%@)", maxMainLag, maxLagPhase) : hangs.joined(separator: ", "))
         check("memory", rss1 < 600, String(format: "memory %.0f → %.0f MB", rss0, rss1))
         struct Report: Codable { var passed: Int; var failed: Int; var results: [Result] }
         let report = Report(passed: results.filter(\.ok).count, failed: results.filter { !$0.ok }.count, results: results)
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted]
         try? enc.encode(report).write(to: out)
+        // Keep the connection log next to the report (the test data folder is deleted afterwards).
+        AccessLog.shared.flush()
+        try? FileManager.default.removeItem(at: out.deletingPathExtension().appendingPathExtension("connections.log"))
+        try? FileManager.default.copyItem(at: AccessLog.shared.fileURL, to: out.deletingPathExtension().appendingPathExtension("connections.log"))
         try? FileManager.default.removeItem(at: work)
         model.pool.stopAll()
         exit(report.failed == 0 ? 0 : 1)

@@ -3,11 +3,17 @@
 
 Implements the subset used by Vedetta: get_encrypt_info, RSA login, device_info,
 chm.added_dev, system.get_user_id, playback search (year/day/events), logout.
+Like a real recorder it keeps several sessions, locks a user after 5 consecutive failed
+logins (and "sounds the buzzer"), and can be made unresponsive.
 Video comes from the mediamtx test bench (scripts/test-rtsp-server.sh).
+
+Control (plain HTTP on <port>+2, test bench only):
+  GET  /stats                       counters as JSON
+  POST /control {"offline": bool, "password": str, "expire": true, "lock": seconds, "reset": true}
 
 Usage: python3 mock_nvr.py <port> <credentials-file>
 """
-import base64, hashlib, json, os, random, ssl, string, subprocess, sys, time, urllib.parse
+import base64, hashlib, json, os, random, ssl, string, subprocess, sys, threading, time, urllib.parse
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
@@ -15,7 +21,9 @@ from cryptography.hazmat.primitives import serialization
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8443
 CRED = dict(line.strip().split("=", 1) for line in open(sys.argv[2]) if "=" in line)
-USER, PASS = CRED["USER"], CRED["PASS"]
+USERS = {CRED["USER"]: CRED["PASS"]}
+if "VUSER" in CRED: USERS[CRED["VUSER"]] = CRED["VPASS"]
+ORIGINAL = dict(USERS)
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENV = os.path.join(HERE, "testenv")
 
@@ -25,7 +33,10 @@ def spki(k):
     der = k.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     return urllib.parse.quote(base64.b64encode(der).decode(), safe="")
 
-STATE = {"nonce": None, "stok": None, "fails": 0}
+LOCK = threading.Lock()
+STATE = {"nonce": None, "sessions": {}, "fails": 0, "locked_until": 0, "offline": False}
+STATS = {"logins": 0, "failed": 0, "locked_replies": 0, "buzzer": 0, "logouts": 0,
+         "logins_while_offline": 0, "requests_while_offline": 0, "logouts_while_offline": 0, "login_log": []}
 
 def day_segments(day):
     base = datetime(day.year, day.month, day.day)
@@ -51,20 +62,45 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def hang_if_offline(self, req=None):
+        """Unresponsive recorder: count what arrives, never answer."""
+        if not STATE["offline"]:
+            return False
+        with LOCK:
+            STATS["requests_while_offline"] += 1
+            if req and "login" in req and "password" in req["login"]:
+                STATS["logins_while_offline"] += 1
+            if req and "system" in req and "logout" in req["system"]:
+                STATS["logouts_while_offline"] += 1
+        end = time.time() + 30
+        while STATE["offline"] and time.time() < end:
+            time.sleep(0.2)
+        self.close_connection = True
+        return True
+
     def do_GET(self):
+        if self.hang_if_offline():
+            return
         body = b"<html><body><h1>Mock VIGI NVR</h1></body></html>"
         self.send_response(200); self.send_header("Content-Type", "text/html"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length", 0))
         req = json.loads(self.rfile.read(n) or b"{}")
+        if self.hang_if_offline(req):
+            return
         path = self.path
         if path == "/":
             return self.anon(req)
         if path.startswith("/stok="):
             tok = path[len("/stok="):].split("/")[0]
-            if tok != STATE["stok"]:
+            if tok not in STATE["sessions"]:
                 return self.reply({"error_code": -40401})
+            if "system" in req and "logout" in req["system"]:
+                with LOCK:
+                    STATE["sessions"].pop(tok, None)
+                    STATS["logouts"] += 1
+                return self.reply({"error_code": 0})
             return self.ds(req)
         self.reply({"error_code": -1}, 404)
 
@@ -82,19 +118,36 @@ class H(BaseHTTPRequestHandler):
             lg = req["login"]
             if "password" not in lg:
                 return self.reply(self.challenge())
+            with LOCK:
+                STATS["logins"] += 1
+                if time.time() < STATE["locked_until"]:
+                    STATS["locked_replies"] += 1
+                    STATS["buzzer"] += 1
+                    left = int(STATE["locked_until"] - time.time()) + 1
+                    return self.reply({"error_code": -40404, "data": {"code": -40404, "sec_left": left}})
             try:
                 blob = base64.b64decode(urllib.parse.unquote(lg["password"]))
                 k = key2 if lg.get("keyType") == "1" else key1
                 plain = k.decrypt(blob, padding.PKCS1v15()).decode()
             except Exception as e:
                 plain = ""
-            expected = hashlib.sha256(PASS.encode()).hexdigest().upper() + ":" + (STATE["nonce"] or "")
-            if urllib.parse.unquote(lg.get("username", "")) == USER and plain == expected and lg.get("passwdType") == "sha256":
-                STATE["stok"] = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(32))
-                STATE["fails"] = 0
-                return self.reply({"error_code": 0, "stok": STATE["stok"], "user_group": "root"})
-            STATE["fails"] += 1
-            return self.reply({"error_code": -40210, "data": {"code": -40210, "sec_left": 0}})
+            user = urllib.parse.unquote(lg.get("username", ""))
+            nonce, STATE["nonce"] = STATE["nonce"], None   # a single nonce, as on the real firmware
+            with LOCK:
+                if user in USERS and nonce and plain == hashlib.sha256(USERS[user].encode()).hexdigest().upper() + ":" + nonce and lg.get("passwdType") == "sha256":
+                    stok = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(32))
+                    STATE["sessions"][stok] = user
+                    STATE["fails"] = 0
+                    STATS["login_log"].append("%s ok %s" % (user, time.strftime("%H:%M:%S")))
+                    return self.reply({"error_code": 0, "stok": stok, "user_group": "root" if user == "admin" else "user"})
+                STATE["fails"] += 1
+                STATS["failed"] += 1
+                STATS["login_log"].append("%s refused %s" % (user, time.strftime("%H:%M:%S")))
+                STATS["buzzer"] += 1
+                if STATE["fails"] >= 5:
+                    STATE["locked_until"] = time.time() + 120
+                    return self.reply({"error_code": -40404, "data": {"code": -40404, "sec_left": 120}})
+                return self.reply({"error_code": -40210, "data": {"code": -40210, "attempts": 5 - STATE["fails"]}})
         self.reply({"error_code": -40101})
 
     def ds(self, req):
@@ -135,6 +188,46 @@ class H(BaseHTTPRequestHandler):
                 return self.reply({"error_code": 0, "playback": {"search_video_results": [{"r%d" % i: e} for i, e in enumerate(evs)]}})
         self.reply({"error_code": 0})
 
+class Control(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+
+    def send_json(self, obj):
+        data = json.dumps(obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def stats(self):
+        with LOCK:
+            out = dict(STATS)
+            out["sessions"] = sorted(STATE["sessions"].values())
+            out["locked"] = time.time() < STATE["locked_until"]
+            out["offline"] = STATE["offline"]
+        return out
+
+    def do_GET(self):
+        self.send_json(self.stats())
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0))
+        cmd = json.loads(self.rfile.read(n) or b"{}")
+        with LOCK:
+            if "offline" in cmd: STATE["offline"] = bool(cmd["offline"])
+            if "password" in cmd: USERS[CRED["USER"]] = cmd["password"] or ORIGINAL[CRED["USER"]]
+            if cmd.get("expire"): STATE["sessions"].clear()
+            if "lock" in cmd: STATE["locked_until"] = time.time() + float(cmd["lock"]) if cmd["lock"] else 0
+            if cmd.get("reset"):
+                USERS.clear(); USERS.update(ORIGINAL)
+                STATE.update({"fails": 0, "locked_until": 0, "offline": False})
+                STATE["sessions"].clear()
+                STATS["login_log"] = []
+        self.send_json(self.stats())
+
+def control_server():
+    ThreadingHTTPServer(("127.0.0.1", PORT + 2), Control).serve_forever()
+
 if __name__ == "__main__":
     cert, key = os.path.join(ENV, "mock.crt"), os.path.join(ENV, "mock.key")
     if not os.path.exists(cert):
@@ -144,5 +237,6 @@ if __name__ == "__main__":
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(cert, key)
     srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
-    print("mock NVR on https://127.0.0.1:%d" % PORT, flush=True)
+    threading.Thread(target=control_server, daemon=True).start()
+    print("mock NVR on https://127.0.0.1:%d (control on %d)" % (PORT, PORT + 2), flush=True)
     srv.serve_forever()

@@ -33,14 +33,17 @@ and a tiny CPU footprint — **16 cameras live at ~10–13 % CPU** on an Apple S
 
 ## Features
 
-- **Live view** — grids of 1, 4, 6, 8, 9 and 16 tiles, pages and automatic tour, drag & drop cameras,
-  full screen, separate windows for other monitors, digital zoom, audio, snapshots and local MP4 recording.
-  Small tiles automatically use the light sub-stream; enlarged tiles switch to high quality.
+- **Live view** — grids of 1, 4, 6, 8, 9 and 16 tiles, pages and automatic tour, drag a tile onto another
+  to swap cameras, full screen, separate windows for other monitors, digital zoom, audio. Small tiles use the
+  light sub-stream, enlarged tiles high quality; **snapshots and recordings always use the full-quality stream**.
+  Camera names always / on hover / never; pictures fit, fill or stretch (no cropping of the camera clock).
 - **Recordings** — month calendar with recording days, zoomable 24-hour timeline with recording gaps and
   colour-coded events (motion, people, vehicles, line crossing, intrusion…), synchronized playback of up
   to 4 cameras, pause, frame-by-frame, ±10 s, jump to previous/next event, speed control when supported.
+  **Keyboard shortcuts** (single keys) and **one-hand mouse use**: the wheel zooms the timeline around the
+  pointer, buttons zoom/scroll/set the selection.
 - **Export to MP4** — save any time range or single event on your Mac with **no re-encoding**
-  (H.264/H.265 as recorded), queue with progress, cancel, retry and resume after restart.
+  (H.264/H.265 as recorded), with or without audio, queue with progress, cancel, retry and resume after restart.
 - **Events & notifications** — daily event list with filters; macOS notifications for new detections;
   click a notification to replay the moment.
 - **PTZ** — joystick, zoom, speed and saved positions for motorized ONVIF cameras.
@@ -48,6 +51,12 @@ and a tiny CPU footprint — **16 cameras live at ~10–13 % CPU** on an Apple S
   renaming/hiding, and the device web interface inside the app for advanced settings.
 - **Efficient** — streams pause when the window is hidden or the Mac sleeps, reconnect automatically,
   and share one connection per camera.
+- **Safe for your recorder's accounts** — one shared session per recorder, one login attempt at a time,
+  no login at all while the recorder is unreachable (only password-free checks with growing pauses),
+  and a refused password or a locked user stops every automatic attempt: your NVR never locks the user
+  or sounds its buzzer because of Vedetta. Sign out / switch user from the app menu or Settings.
+- **Settings that last** — saved as you change them, readable across versions (a damaged file is set aside
+  and the backup used), File › Export/Import Settings (everything except passwords).
 - **Private** — passwords stay in the macOS Keychain; Vedetta only talks to devices on your network.
   No accounts, no cloud, no telemetry.
 - **Multilingual** — English, Italiano, Français. Vedetta follows the language of macOS and can be
@@ -97,7 +106,9 @@ Package a release with `scripts/package.sh` (zip + DMG + SHA-256; optional notar
 ```bash
 swift test                        # unit tests
 scripts/regression.sh             # full regression: protocols against local mock NVRs, in-app end-to-end
-                                  # self tests in IT/EN/FR, reconnection, 16-camera performance, hangs, memory
+                                  # self tests in IT/EN/FR, reconnection, account protection (recorder offline
+                                  # 2 min, refused password, locked user, sign out, switch user),
+                                  # 16-camera performance, hangs, memory
 ```
 
 The regression suite needs `mediamtx` and `ffmpeg` (`brew install mediamtx ffmpeg`) and runs entirely on
@@ -123,6 +134,29 @@ Swift packages, no third-party runtime dependencies:
 | `Vedetta` | SwiftUI app (Liquid Glass) |
 
 More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Account safety
+
+Recorders lock a user (and often sound their buzzer) after a few failed logins. Vedetta is built never to
+cause that:
+
+- **One session per recorder**, shared by live view, recordings, events and exports. Video streams start
+  only after the credentials have been confirmed.
+- **Network problems never cause logins.** When the recorder stops answering, Vedetta checks it without
+  sending the password, after 5 s, 10 s, 20 s… up to 5 minutes (with jitter), and reuses the existing
+  session when it comes back.
+- **One attempt at a time.** Features never log in in parallel.
+- **Refused password or locked user → full stop.** No automatic attempt until you sign in again, or until
+  the unlock time the recorder reported. Vedetta tells you why and shows the sign-in screen.
+- **Sign out / Switch user** (app menu, Settings › Accounts, device card) closes the video, ends the session
+  on the recorder (only locally if it is unreachable or the user is locked), deletes the saved password and
+  returns to the sign-in screen.
+- **Connection log** — every attempt with time, result and error code, without passwords:
+  `~/Library/Application Support/Vedetta/Logs/connections.log` (Settings › Accounts › Connection log).
+
+**Use a dedicated user.** Create a user on the recorder with view-only permissions (live view and
+playback) just for Vedetta, instead of `admin`: the admin account and the recorder's own apps stay
+unaffected whatever happens.
 
 ## Privacy & security
 

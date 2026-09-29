@@ -51,6 +51,14 @@ struct ExportSheet: View {
                     }
                 }
             }
+            Toggle(isOn: Binding(get: { model.settings.exportAudio }, set: { model.settings.exportAudio = $0 })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("Include the audio"))
+                    Text(L("Only if the camera records sound. Without audio the file is smaller."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
             HStack {
                 Label(model.settings.exportsURL.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"), systemImage: "folder")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
@@ -74,7 +82,8 @@ struct ExportSheet: View {
     private func save() {
         for ch in channels where selected.contains(ch.id) {
             guard let d = model.device(for: ch) else { continue }
-            model.exports.enqueue(device: d, channel: ch, start: start, end: end, folder: model.settings.exportsURL)
+            model.exports.enqueue(device: d, channel: ch, start: start, end: end, folder: model.settings.exportsURL,
+                                  includeAudio: model.settings.exportAudio)
         }
         model.toast(.info, L("Export started"), L("Follow the progress in the Exports section."))
         dismiss()

@@ -52,7 +52,7 @@ final class AppModel {
     var layout = LiveLayout() { didSet { layoutStore.save(layout) } }
 
     // UI state
-    var section: AppSection = .live
+    var section: AppSection = .live { didSet { UserDefaults.standard.set(section.rawValue, forKey: "LastSection") } }
     var selectedTile: Int? = nil
     var singleTileRestore: GridKind? = nil
     var tourRunning = false
@@ -66,6 +66,16 @@ final class AppModel {
     var newEventCount = 0
     /// false until device passwords have been read from the Keychain.
     var credentialsReady = false
+    /// Account protection state of each device (see AccessGuard).
+    var access: [UUID: AccessState] = [:]
+    /// Sign-in requested for a device (sheet), e.g. after "Switch user".
+    var signIn: SignInRequest?
+
+    struct SignInRequest: Identifiable, Equatable {
+        let id = UUID()
+        var deviceID: UUID
+        var clearUser = false
+    }
 
     struct PlaybackRequest: Equatable {
         var channelIDs: [String]
@@ -88,6 +98,7 @@ final class AppModel {
         devices = devicesStore.load() ?? []
         settings = settingsStore.load() ?? .defaults
         layout = layoutStore.load() ?? LiveLayout()
+        if let last = UserDefaults.standard.string(forKey: "LastSection"), let sec = AppSection(rawValue: last), sec != .devices { section = sec }
         isLocked = settings.lockWithTouchID
         exports.deviceLookup = { [weak self] id in self?.devices.first { $0.id == id } }
         exports.onCompleted = { [weak self] rec in
@@ -99,10 +110,18 @@ final class AppModel {
         SelfTest.startIfRequested(model: self)
         observeSystem()
         eventMonitor = EventMonitor(model: self)
+        DeviceClients.shared.onStateChange = { [weak self] id, state in self?.accessChanged(id, state) }
+        exports.canRun = { [weak self] id in
+            MainActor.assumeIsolated {
+                guard let d = self?.devices.first(where: { $0.id == id }) else { return true }
+                return DeviceClients.shared.state(of: d).isUsable
+            }
+        }
         CredentialCache.shared.preload(devices.map(\.id)) { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.credentialsReady = true
+                self.startSessions()
                 self.exports.pump()
                 // Dev / self-test runs must never post notifications to the user.
                 if self.settings.notificationsEnabled && !Self.isDevMode { self.eventMonitor?.start() }
@@ -122,14 +141,71 @@ final class AppModel {
         return nil
     }
 
+    // MARK: Accounts (lockout protection)
+
+    func accessState(_ d: Device) -> AccessState { access[d.id] ?? .unverified }
+    var devicesNeedingSignIn: [Device] { devices.filter { accessState($0).needsUser } }
+    /// Every device needs the user: show the sign-in screen instead of the main window.
+    var everyDeviceNeedsSignIn: Bool { hasDevices && devicesNeedingSignIn.count == devices.count }
+
+    /// One verification per device at launch (VIGI: the single login whose session every feature then shares;
+    /// ONVIF: GetDeviceInformation). Streams wait for its result, so refused credentials are never retried.
+    private func startSessions() {
+        for d in devices {
+            let g = DeviceClients.shared.accessGuard(for: d)
+            // A guard created before the Keychain was read may think the password is missing.
+            if g.state == .missingPassword, d.storedCredentials != nil { g.reset(verified: false) }
+            if g.state != .missingPassword, d.storedCredentials == nil { g.markMissingPassword() }
+            access[d.id] = g.state
+            g.verifyIfNeeded()
+        }
+    }
+
+    private func accessChanged(_ id: UUID, _ state: AccessState) {
+        let old = access[id]
+        access[id] = state
+        guard let d = devices.first(where: { $0.id == id }) else { return }
+        if state.isUsable { exports.pump() }
+        guard old != state, !Self.isDevMode else { return }
+        switch state {
+        case .rejected, .locked:
+            if !(old?.needsUser ?? false) {
+                Notifier.post(title: L("Vedetta stopped connecting to %@", d.name), body: state.message, id: "access-\(id)")
+            }
+        default: break
+        }
+    }
+
+    /// "Sign out" / "Switch user": closes every stream, ends the session on the recorder (only when it can be
+    /// reached, never logging in), stops every retry, deletes the saved password and shows the sign-in screen.
+    func signOut(_ d: Device, switchUser: Bool = false) async {
+        access[d.id] = .signedOut
+        stopLiveRecordings(of: d.id)
+        await DeviceClients.shared.signOut(d, pool: pool)
+        exports.interrupt(deviceID: d.id, message: L("Interrupted: signed out of the recorder"))
+        index.clearCache()
+        reloadToken = UUID()
+        if switchUser || !everyDeviceNeedsSignIn { signIn = SignInRequest(deviceID: d.id, clearUser: switchUser) }
+    }
+
+    /// "Try again" after a refusal/lock (one attempt with the saved password) or while offline (immediate check).
+    func retryAccess(_ d: Device) {
+        guard d.storedCredentials != nil else { signIn = SignInRequest(deviceID: d.id); return }
+        DeviceClients.shared.accessGuard(for: d).retryNow()   // the device's first check runs by itself
+        reloadToken = UUID()
+    }
+
     // MARK: Devices
 
     func addOrUpdate(_ result: ConnectResult, password: String) {
         let d = result.device
         CredentialCache.shared.set(password, for: d.id)
-        DeviceClients.shared.invalidate(d.id)
+        DeviceClients.shared.adopt(result)
+        access[d.id] = .online
+        if signIn?.deviceID == d.id { signIn = nil }
         if let i = devices.firstIndex(where: { $0.id == d.id }) {
             devices[i] = d
+            stopLiveRecordings(of: d.id)
             pool.restart(keysWithPrefix: d.id.uuidString)
             reloadToken = UUID()
         } else {
@@ -146,6 +222,7 @@ final class AppModel {
         index.clearCache()
         for w in result.warnings { toast(.warning, L("Warning"), w) }
         eventMonitor?.restart()
+        exports.pump()
     }
 
     func updateDevice(_ d: Device) {
@@ -154,10 +231,13 @@ final class AppModel {
     }
 
     func remove(_ d: Device) {
+        stopLiveRecordings(of: d.id)
         pool.restart(keysWithPrefix: d.id.uuidString)
         CredentialCache.shared.remove(d.id)
         TrustStore.shared.forget(host: d.host)
-        DeviceClients.shared.invalidate(d.id)
+        DeviceClients.shared.forget(d.id)
+        access[d.id] = nil
+        if signIn?.deviceID == d.id { signIn = nil }
         let ids = Set(d.channels.map(\.id))
         layout.slots = layout.slots.map { $0.flatMap { ids.contains($0) ? nil : $0 } }
         while layout.slots.last == .some(nil) { layout.slots.removeLast() }
@@ -304,6 +384,134 @@ final class AppModel {
         let name = "\(channel.name) \(f.string(from: Date())).mp4".replacingOccurrences(of: "/", with: "-")
         try? FileManager.default.createDirectory(at: settings.recordingsURL, withIntermediateDirectories: true)
         return settings.recordingsURL.appendingPathComponent(name)
+    }
+
+    // MARK: Live streams, full-quality recording and snapshots
+
+    static func streamKey(_ d: Device, _ ch: Channel, _ kind: StreamKind) -> String {
+        "\(d.id.uuidString)|\(ch.id)|\(kind == .main ? "main" : "sub")"
+    }
+
+    /// Shared live stream of a channel (one connection however many viewers); balance with `pool.release`.
+    func acquireStream(device: Device, channel: Channel, kind: StreamKind) -> LiveStream? {
+        guard let url = StreamURLs.live(device: device, channel: channel, kind: kind) else { return nil }
+        return pool.acquire(key: Self.streamKey(device, channel, kind), url: url, credentials: device.credentials,
+                            title: channel.name, accessGuard: DeviceClients.shared.accessGuard(for: device))
+    }
+
+    struct LiveRecording {
+        let stream: LiveStream
+        let url: URL
+        var started: Date?
+    }
+    /// Recordings on this Mac, by channel. Always from the main (full quality) stream, whatever the tile shows.
+    var liveRecordings: [String: LiveRecording] = [:]
+
+    func toggleLiveRecording(channel: Channel, device: Device) {
+        if let rec = liveRecordings.removeValue(forKey: channel.id) {
+            rec.stream.stopRecording { url, err in
+                DispatchQueue.main.async {
+                    self.pool.release(rec.stream)
+                    if let url { self.toast(.success, L("Recording saved"), channel.name, file: url) }
+                    else if let err { self.toast(.error, L("Recording not saved"), err.localizedDescription) }
+                }
+            }
+            return
+        }
+        guard let s = acquireStream(device: device, channel: channel, kind: .main) else { return }
+        let url = recordingURL(for: channel)
+        liveRecordings[channel.id] = LiveRecording(stream: s, url: url, started: nil)
+        s.startRecording(to: url, wait: 15) { err in
+            DispatchQueue.main.async {
+                if let err {
+                    if self.liveRecordings[channel.id]?.url == url { self.liveRecordings[channel.id] = nil }
+                    self.pool.release(s)
+                    self.toast(.error, L("Cannot record"), err.localizedDescription)
+                } else {
+                    self.liveRecordings[channel.id]?.started = Date()
+                    let res = s.status.resolution
+                    self.toast(.info, L("Recording started"), res == .zero
+                               ? L("%@ — the file is being saved on this Mac", channel.name)
+                               : L("%@ — full quality (%@), saved on this Mac", channel.name, "\(Int(res.width))×\(Int(res.height))"))
+                }
+            }
+        }
+    }
+
+    /// Quitting: finalizes every recording file, then calls `done` (at most after 5 s).
+    func finishAllRecordings(done: @escaping @MainActor () -> Void) {
+        let list = Array(liveRecordings.values)
+        liveRecordings.removeAll()
+        guard !list.isEmpty else { return done() }
+        var left = list.count
+        var called = false
+        func finish() { if !called { called = true; done() } }
+        for rec in list {
+            rec.stream.stopRecording { _, _ in
+                DispatchQueue.main.async { MainActor.assumeIsolated { left -= 1; if left == 0 { finish() } } }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { MainActor.assumeIsolated { finish() } }
+    }
+
+    func stopLiveRecordings(of deviceID: UUID) {
+        for (id, _) in liveRecordings where channel(id: id)?.deviceID == deviceID {
+            if let ch = channel(id: id), let d = device(for: ch) { toggleLiveRecording(channel: ch, device: d) }
+        }
+    }
+
+    /// Snapshot at the camera's full resolution: taken from the main stream even when the tile shows the light one.
+    func saveFullQualitySnapshot(channel: Channel, device: Device, current: CGImage?, currentIsMain: Bool) {
+        if currentIsMain, let current { return saveSnapshot(current, channel: channel) }
+        guard let s = acquireStream(device: device, channel: channel, kind: .main) else { return saveSnapshot(current, channel: channel) }
+        s.snapshotWhenReady(wait: 8) { img in
+            DispatchQueue.main.async {
+                self.pool.release(s)
+                self.saveSnapshot(img ?? current, channel: channel)
+            }
+        }
+    }
+
+    // MARK: Tiles
+
+    /// Drag of a live tile onto another one (swaps them, or moves into an empty tile).
+    struct TileDrag: Equatable {
+        var from: Int
+        var channelID: String
+        var name: String
+        var location: CGPoint
+    }
+    var tileDrag: TileDrag?
+    /// The playback on screen (Recordings section), for diagnostics and the self test.
+    @ObservationIgnored weak var activePlayback: PlaybackSession?
+
+    // MARK: Settings backup
+
+    func exportSettings(to url: URL) throws {
+        JSONStore<AppSettings>.flushAll()
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let lang = AppLanguage.override == .system ? nil : AppLanguage.override.rawValue
+        let backup = SettingsBackup(appVersion: version, settings: settings, layout: layout, devices: devices, language: lang)
+        try backup.encoded().write(to: url, options: .atomic)
+    }
+
+    /// Replaces devices, layout and settings. Passwords are not in the file: devices without a saved password
+    /// ask to sign in (nothing is attempted with an empty password).
+    func importSettings(_ b: SettingsBackup) {
+        for d in devices where !b.devices.contains(where: { $0.id == d.id }) { remove(d) }
+        for d in devices { stopLiveRecordings(of: d.id); pool.restart(keysWithPrefix: d.id.uuidString); DeviceClients.shared.forget(d.id) }
+        devices = b.devices
+        layout = b.layout
+        settings = b.settings
+        if let l = b.language.flatMap(AppLanguage.init(rawValue:)) { AppLanguage.override = l }
+        access = [:]
+        index.clearCache()
+        CredentialCache.shared.preload(devices.map(\.id)) { [weak self] in
+            MainActor.assumeIsolated {
+                self?.startSessions()
+                self?.reloadToken = UUID()
+            }
+        }
     }
 
     func saveSnapshot(_ image: CGImage?, channel: Channel) {

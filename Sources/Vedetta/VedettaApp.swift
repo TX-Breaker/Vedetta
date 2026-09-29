@@ -57,6 +57,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let busy = MainActor.assumeIsolated { model?.exports.activeCount ?? 0 }
+        let recording = MainActor.assumeIsolated { !(model?.liveRecordings.isEmpty ?? true) }
+        if busy == 0, recording {
+            // Close the MP4 files properly before quitting.
+            MainActor.assumeIsolated { model?.finishAllRecordings { NSApp.reply(toApplicationShouldTerminate: true) } }
+            return .terminateLater
+        }
         guard busy > 0 else { return .terminateNow }
         let alert = NSAlert()
         alert.messageText = L("Exports in progress")
@@ -67,7 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        MainActor.assumeIsolated { model?.pool.stopAll() }
+        MainActor.assumeIsolated {
+            model?.pool.stopAll()
+            DeviceClients.shared.logoutAll()   // no session left open on the recorders
+            JSONStore<AppSettings>.flushAll()   // pending settings writes reach the disk
+        }
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
@@ -94,6 +104,14 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button(L("Add device…")) { model.showAddDevice = true }
                 .keyboardShortcut("n")
+        }
+        CommandGroup(replacing: .importExport) {
+            Button(L("Export Settings…")) { SettingsTransfer.export(model: model) }
+            Button(L("Import Settings…")) { SettingsTransfer.importFile(model: model) }
+        }
+        CommandGroup(after: .appSettings) {
+            Divider()
+            AccountMenuItems(model: model)
         }
         CommandMenu(L("View")) {
             ForEach(Array(AppSection.allCases.enumerated()), id: \.element) { i, s in

@@ -2,8 +2,10 @@
 # Full regression suite: build, unit tests, localization check, protocol integration tests against local
 # mocks, in-app end-to-end self tests (VIGI and ONVIF recorders, in Italian/English/French, reconnection),
 # 16-camera performance and idle checks. No real camera needed.
-# Usage: scripts/regression.sh             everything (~15 minutes)
-#        scripts/regression.sh selftest    only the in-app self tests
+# Usage: scripts/regression.sh              everything (~25 minutes)
+#        scripts/regression.sh selftest     only the in-app self tests
+#        scripts/regression.sh resilience   only the account-protection scenario (~8 minutes)
+#        scripts/regression.sh vigi         only the VIGI in-app self test (~5 minutes)
 # Report: scripts/testenv/regression-report.txt
 setopt NO_NOMATCH
 ROOT=${0:A:h:h}
@@ -38,7 +40,7 @@ log "[1] Build"
 if swift build 2>&1 | tail -1 | grep -q "Build complete"; then ok "swift build"; else ko "swift build"; fi
 
 # 2. Unit tests + localization (the CLT build system sometimes misses the Testing macro plugin: retry)
-if [[ $QUICK != selftest ]]; then
+if [[ -z $QUICK ]]; then
   log "[2] Unit tests and translations"
   for i in 1 2 3; do swift build --build-tests >/dev/null 2>&1 && break; done
   UT=$(swift test --skip-build 2>&1)
@@ -63,10 +65,11 @@ for cfg in devconfig devconfig-onvif; do
 done
 sleep 8
 export VEDETTA_USER=$TUSER VEDETTA_PASS=$TPASS
+export VEDETTA_VUSER=$(grep "^VUSER=" $ENV/credentials | cut -d= -f2) VEDETTA_VPASS=$(grep "^VPASS=" $ENV/credentials | cut -d= -f2)
 P=.build/debug/vedetta-probe
 
 # 4. Protocol integration ------------------------------------------------------------------------
-if [[ $QUICK != selftest ]]; then
+if [[ -z $QUICK ]]; then
   log "[4] Protocol integration"
   O=$($P rtsp rtsp://127.0.0.1:8554/live/1/1/avm 4 --record $ENV/t264.mp4 --snapshot $ENV/t264.jpg 2>&1)
   expect "RTSP H.264 1080p hardware decoding" "$O" "HW=true"
@@ -110,19 +113,26 @@ codesign --verify --strict dist/Vedetta.app 2>/dev/null && ok "valid code signat
 for l in en it fr; do [[ -f dist/Vedetta.app/Contents/Resources/$l.lproj/Localizable.strings ]] && ok "bundle contains $l localization" || ko "bundle contains $l localization"; done
 
 # 6. In-app self tests ---------------------------------------------------------------------------
-run_selftest() { # name, devconfig, language
-  local name=$1 cfg=$2 lang=${3:-en} out=$ENV/selftest-$1.json marker=$ENV/restart-$1.marker
+run_selftest() { # name, devconfig, language, [scenario], [timeout]
+  local name=$1 cfg=$2 lang=${3:-en} scenario=${4:-full} limit=${5:-600} out=$ENV/selftest-$1.json marker=$ENV/restart-$1.marker
   cleanup_app_state; rm -f $out $marker
-  VEDETTA_DEV=1 VEDETTA_SELFTEST=1 VEDETTA_DEV_CONFIG=$ROOT/$cfg VEDETTA_SELFTEST_OUT=$ROOT/$out \
-    VEDETTA_SELFTEST_RESTART_MARKER=$ROOT/$marker $APPBIN -AppleLanguages "($lang)" > $ENV/app-$name.log 2>&1 &
+  curl -s -X POST -d '{"reset": true}' http://127.0.0.1:8445/control >/dev/null 2>&1
+  VEDETTA_DEV=1 VEDETTA_SELFTEST=1 VEDETTA_SELFTEST_SCENARIO=$scenario VEDETTA_DEV_CONFIG=$ROOT/$cfg VEDETTA_SELFTEST_OUT=$ROOT/$out \
+    VEDETTA_SELFTEST_RESTART_MARKER=$ROOT/$marker VEDETTA_MOCK_CONTROL=http://127.0.0.1:8445 \
+    $APPBIN -AppleLanguages "($lang)" > $ENV/app-$name.log 2>&1 &
   local pid=$! t=0 maxcpu=0 samples=0 sum=0
-  while kill -0 $pid 2>/dev/null && (( t < 600 )); do
+  while kill -0 $pid 2>/dev/null && (( t < limit )); do
     sleep 2; t=$((t+2))
     local c=$(ps -o pcpu= -p $pid 2>/dev/null | tr -d ' ')
     [[ -n $c ]] && { samples=$((samples+1)); sum=$(( sum + ${c%.*} )); (( ${c%.*} > maxcpu )) && maxcpu=${c%.*}; }
     if [[ -f $marker ]]; then
-      rm -f $marker
-      scripts/test-rtsp-server.sh stop >/dev/null 2>&1; sleep 12; scripts/test-rtsp-server.sh start >/dev/null
+      # The self test asks for the video server to go down/up ("stop", "start") or bounce ("restart").
+      local cmd=$(cat $marker 2>/dev/null); rm -f $marker
+      case $cmd in
+        stop) scripts/test-rtsp-server.sh stop >/dev/null 2>&1 ;;
+        start) scripts/test-rtsp-server.sh start >/dev/null ;;
+        *) scripts/test-rtsp-server.sh stop >/dev/null 2>&1; sleep 12; scripts/test-rtsp-server.sh start >/dev/null ;;
+      esac
     fi
   done
   if kill -0 $pid 2>/dev/null; then kill $pid; ko "self-test $name" "timeout (possible freeze)"; return; fi
@@ -137,13 +147,19 @@ PY
   done
   log "  · CPU $name: average $(( samples ? sum / samples : 0 ))%, peak ${maxcpu}%"
 }
-log "[6] In-app self test — VIGI recorder (Italian, English)"
-run_selftest vigi-it $ENV/devconfig.json it
-run_selftest vigi-en $ENV/devconfig.json en
-log "[7] In-app self test — ONVIF recorder of another brand (French)"
-run_selftest onvif-fr $ENV/devconfig-onvif.json fr
+if [[ $QUICK != resilience ]]; then
+  log "[6] In-app self test — VIGI recorder (Italian, English)"
+  run_selftest vigi-it $ENV/devconfig.json it
+  [[ $QUICK == vigi ]] && { log "== Result: $NPASS passed, $NFAIL failed"; pkill -f mock_nvr.py; pkill -f mock_onvif.py; scripts/test-rtsp-server.sh stop >/dev/null 2>&1; exit $(( NFAIL > 0 )); }
+  run_selftest vigi-en $ENV/devconfig.json en
+  log "[7] In-app self test — ONVIF recorder of another brand (French)"
+  run_selftest onvif-fr $ENV/devconfig-onvif.json fr
+fi
+log "[7b] Account protection — recorder offline 2 min, refused password, locked user, sign out, switch user"
+run_selftest resilience-it $ENV/devconfig.json it resilience 1100
+scripts/test-rtsp-server.sh start >/dev/null 2>&1   # in case the scenario stopped it
 
-if [[ $QUICK != selftest ]]; then
+if [[ -z $QUICK ]]; then
   # 8. Performance: 16 channels ------------------------------------------------------------------
   log "[8] Performance with 16 cameras"
   pkill -f mock_onvif.py; sleep 1

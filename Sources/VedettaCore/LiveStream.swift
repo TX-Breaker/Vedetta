@@ -43,12 +43,15 @@ final class WeakSink {
     init(_ s: VideoSink) { sink = s }
 }
 
-/// One live RTSP stream shared by any number of video views. Reconnects automatically.
+/// One live RTSP stream shared by any number of video views.
+/// Reconnects by itself only for stream problems (with backoff); device-wide problems (unreachable recorder,
+/// refused credentials, locked account, sign out) are handled by the device's AccessGuard, which it waits for.
 public final class LiveStream: @unchecked Sendable {
     public let key: String
     public let url: URL
     public let title: String
     private let credentials: Credentials
+    private let accessGuard: AccessGuard?
     public let status = StreamStatus()
 
     private let queue: DispatchQueue
@@ -81,12 +84,17 @@ public final class LiveStream: @unchecked Sendable {
     private var generation = 0
     private var gotFirstFrame = false
     private var pendingReconnect: DispatchWorkItem?
+    private var pendingRecording: (url: URL, completion: @Sendable (Error?) -> Void)?
+    private var guardObserver: UUID?
+    /// Waiting for the AccessGuard to allow connections again.
+    private var waitingForAccess = false
 
-    public init(key: String, url: URL, credentials: Credentials, title: String) {
+    public init(key: String, url: URL, credentials: Credentials, title: String, accessGuard: AccessGuard? = nil) {
         self.key = key
         self.url = url
         self.credentials = credentials
         self.title = title
+        self.accessGuard = accessGuard
         queue = DispatchQueue(label: "vedetta.live.\(key)", qos: .userInitiated)
     }
 
@@ -97,7 +105,27 @@ public final class LiveStream: @unchecked Sendable {
             guard !running else { return }
             running = true
             attempt = 0
+            waitingForAccess = false
+            if let g = accessGuard, guardObserver == nil {
+                guardObserver = g.observe { [weak self] state in self?.queue.async { self?.accessChanged(state) } }
+            }
             startWatchdog()
+            connect()
+        }
+    }
+
+    /// "Try again" from the user: reconnects now (and lifts a stop caused by refused credentials).
+    public func retryNow() {
+        queue.async { [self] in
+            guard running else { return start() }
+            if let g = accessGuard, !g.state.isUsable {
+                waitingForAccess = true
+                g.retryNow()
+                return
+            }
+            attempt = 0
+            waitingForAccess = false
+            pendingReconnect?.cancel()
             connect()
         }
     }
@@ -105,6 +133,8 @@ public final class LiveStream: @unchecked Sendable {
     public func stop() {
         queue.async { [self] in
             running = false
+            waitingForAccess = false
+            if let o = guardObserver { accessGuard?.removeObserver(o); guardObserver = nil }
             pendingReconnect?.cancel()
             watchdog?.cancel(); watchdog = nil
             client?.stop(); client = nil
@@ -160,24 +190,80 @@ public final class LiveStream: @unchecked Sendable {
             guard let self, gen == self.generation else { return }
             self.scheduleReconnect(reason: error?.localizedDescription ?? L("Connection interrupted"))
         }
+        let g = accessGuard
+        let title = self.title
         Task { [weak self] in
             do {
-                try await c.start()
+                if let g {
+                    try await g.credentialed("RTSP \(title)", important: false, { try await c.start() }) { r in
+                        LiveStream.outcome(r, client: c)
+                    }
+                } else {
+                    try await c.start()
+                }
             } catch {
                 self?.queue.async {
                     guard let self, gen == self.generation else { return }
-                    if case RTSPError.unauthorized = error {
-                        self.client?.stop()
-                        self.setPhase(.failed(L("Wrong user name or password")))
-                        // Do not retry quickly: NVRs lock accounts after repeated failures.
-                        self.scheduleReconnect(reason: nil, delay: 300)
-                    } else {
-                        let msg = error.localizedDescription
-                        self.scheduleReconnect(reason: NetworkHint.looksLikeLocalNetworkBlock(msg)
-                                               ? L("Network unreachable: check Vedetta's Local Network permission") : msg)
-                    }
+                    self.connectFailed(error)
                 }
             }
+        }
+    }
+
+    /// Classifies a connection attempt for the AccessGuard.
+    static func outcome(_ r: Result<Void, Error>, client: RTSPClient) -> AccessOutcome {
+        switch r {
+        case .success: return .confirmed
+        case .failure(RTSPError.unauthorized):
+            return .denied(L("The recorder refused the user name or password for the video. Automatic attempts are stopped to avoid locking the account."))
+        case .failure(RTSPError.unreachable(let m)): return .network(m)
+        case .failure: return client.credentialsAccepted ? .confirmed : .neutral
+        }
+    }
+
+    private func connectFailed(_ error: Error) {
+        if let blocked = error as? AccessBlocked { return waitForAccess(blocked.state) }
+        if case RTSPError.unauthorized = error {
+            client?.stop(); client = nil
+            generation += 1
+            if let g = accessGuard, g.state.needsUser { return waitForAccess(g.state) }
+            // Only this camera refused us (e.g. the user lacks permission for it): no automatic retry.
+            setPhase(.failed(L("Access to this camera was refused: check the user's permissions on the recorder.")))
+            return
+        }
+        if let g = accessGuard, g.state.isOffline { return waitForAccess(g.state) }
+        let msg = error.localizedDescription
+        scheduleReconnect(reason: NetworkHint.looksLikeLocalNetworkBlock(msg)
+                          ? L("Network unreachable: check Vedetta's Local Network permission") : msg)
+    }
+
+    /// Stops trying until the device's AccessGuard allows connections again.
+    private func waitForAccess(_ state: AccessState) {
+        client?.stop(); client = nil
+        generation += 1
+        pendingReconnect?.cancel()
+        waitingForAccess = true
+        setPhase(state.needsUser ? .failed(state.message) : .reconnecting(state.message))
+    }
+
+    private func accessChanged(_ state: AccessState) {
+        guard running else { return }
+        if state.needsUser {
+            // Refused, locked or signed out: close the stream at once.
+            if !waitingForAccess || client != nil { waitForAccess(state) } else { setPhase(.failed(state.message)) }
+            return
+        }
+        guard waitingForAccess else { return }
+        if state.isUsable {
+            waitingForAccess = false
+            attempt = 0
+            pendingReconnect?.cancel()
+            // Spread the reconnections of all cameras.
+            let work = DispatchWorkItem { [weak self] in self?.connect() }
+            pendingReconnect = work
+            queue.asyncAfter(deadline: .now() + Double.random(in: 0.1...1.5), execute: work)
+        } else {
+            setPhase(.reconnecting(state.message))
         }
     }
 
@@ -186,7 +272,7 @@ public final class LiveStream: @unchecked Sendable {
         client?.stop()
         client = nil
         generation += 1
-        let wait = delay ?? min(30, pow(2, Double(attempt)))
+        let wait = delay ?? Backoff.standard.delay(attempt: attempt, random: Double.random(in: 0...1))
         attempt += 1
         if let reason { setPhase(.reconnecting(reason)) }
         pendingReconnect?.cancel()
@@ -267,6 +353,10 @@ public final class LiveStream: @unchecked Sendable {
             attempt = 0
             setPhase(.playing)
         }
+        if au.isKeyframe, let p = pendingRecording {
+            pendingRecording = nil
+            beginRecording(to: p.url, completion: p.completion)
+        }
     }
 
     private func handleAudio(_ f: AudioFrame) {
@@ -313,9 +403,25 @@ public final class LiveStream: @unchecked Sendable {
 
     // MARK: Recording & snapshots
 
-    public func startRecording(to url: URL, completion: @escaping @Sendable (Error?) -> Void) {
+    /// Starts recording; if the picture is not there yet (stream just opened), waits for it up to `wait` seconds.
+    public func startRecording(to url: URL, wait: TimeInterval = 0, completion: @escaping @Sendable (Error?) -> Void) {
         queue.async { [self] in
-            guard let format else { completion(RecorderError.cannotCreate(L("waiting for video"))); return }
+            guard format != nil, !gopAUs.isEmpty || wait <= 0 else {
+                guard wait > 0 else { completion(RecorderError.cannotCreate(L("waiting for video"))); return }
+                pendingRecording = (url, completion)
+                queue.asyncAfter(deadline: .now() + wait) { [weak self] in
+                    guard let self, let p = self.pendingRecording, p.url == url else { return }
+                    self.pendingRecording = nil
+                    p.completion(RecorderError.cannotCreate(L("waiting for video")))
+                }
+                return
+            }
+            beginRecording(to: url, completion: completion)
+        }
+    }
+
+    private func beginRecording(to url: URL, completion: @escaping @Sendable (Error?) -> Void) {
+        guard let format else { completion(RecorderError.cannotCreate(L("waiting for video"))); return }
             do {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 let r = try MP4Recorder(url: url, videoFormat: format, audio: audioInfo)
@@ -326,11 +432,29 @@ public final class LiveStream: @unchecked Sendable {
             } catch {
                 completion(error)
             }
-        }
     }
 
     public func stopRecording(completion: @escaping @Sendable (URL?, Error?) -> Void) {
-        queue.async { [self] in finishRecording(completion: completion) }
+        queue.async { [self] in
+            if let p = pendingRecording {
+                pendingRecording = nil
+                p.completion(RecorderError.cannotCreate(L("waiting for video")))
+            }
+            finishRecording(completion: completion)
+        }
+    }
+
+    /// Snapshot as soon as a full picture is available (stream just opened), or nil after `wait` seconds.
+    public func snapshotWhenReady(wait: TimeInterval, completion: @escaping @Sendable (CGImage?) -> Void) {
+        let deadline = Date().addingTimeInterval(wait)
+        func attempt() {
+            snapshot { img in
+                if let img { return completion(img) }
+                guard Date() < deadline else { return completion(nil) }
+                DispatchQueue.global().asyncAfter(deadline: .now() + 0.25) { attempt() }
+            }
+        }
+        attempt()
     }
 
     private func finishRecording(completion: (@Sendable (URL?, Error?) -> Void)?) {
@@ -365,7 +489,7 @@ public final class StreamPool {
 
     public init() {}
 
-    public func acquire(key: String, url: URL, credentials: Credentials, title: String) -> LiveStream {
+    public func acquire(key: String, url: URL, credentials: Credentials, title: String, accessGuard: AccessGuard? = nil) -> LiveStream {
         if var e = entries[key], e.stream.url == url {
             e.refs += 1
             e.stopWork?.cancel()
@@ -374,7 +498,7 @@ public final class StreamPool {
             return e.stream
         }
         if let old = entries[key] { old.stream.stop() }
-        let s = LiveStream(key: key, url: url, credentials: credentials, title: title)
+        let s = LiveStream(key: key, url: url, credentials: credentials, title: title, accessGuard: accessGuard)
         entries[key] = Entry(stream: s, refs: 1, stopWork: nil)
         if !isSuspended { s.start() }
         return s

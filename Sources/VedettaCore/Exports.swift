@@ -19,6 +19,8 @@ public struct ExportRecord: Codable, Identifiable, Sendable {
     public var bytes: Int64
     public var message: String?
     public var createdAt: Date
+    /// nil (older queues) = with audio.
+    public var includeAudio: Bool?
 }
 
 /// Downloads NVR recordings to local MP4 files (no re-encoding), with a persistent queue.
@@ -55,7 +57,7 @@ public final class ExportManager {
     }
 
     @discardableResult
-    public func enqueue(device: Device, channel: Channel, start: Date, end: Date, folder: URL) -> ExportRecord {
+    public func enqueue(device: Device, channel: Channel, start: Date, end: Date, folder: URL, includeAudio: Bool = true) -> ExportRecord {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         var url = folder.appendingPathComponent(Self.fileName(device: device, channel: channel, start: start, end: end))
         var n = 2
@@ -65,7 +67,7 @@ public final class ExportManager {
         }
         let rec = ExportRecord(id: UUID(), deviceID: device.id, channelID: channel.id,
                                title: "\(channel.name) · \(device.name)", start: start, end: end, fileURL: url,
-                               state: .queued, progress: 0, bytes: 0, message: nil, createdAt: Date())
+                               state: .queued, progress: 0, bytes: 0, message: nil, createdAt: Date(), includeAudio: includeAudio)
         jobs.insert(rec, at: 0)
         persist()
         pump()
@@ -80,6 +82,16 @@ public final class ExportManager {
             pump()
         }
     }
+
+    /// Interrupts the running exports of a device (sign out): they can be retried later.
+    public func interrupt(deviceID: UUID, message: String) {
+        for job in jobs where job.deviceID == deviceID && job.state == .running {
+            finish(id: job.id, success: false, message: message)
+        }
+    }
+
+    /// false while a device is offline, refused, locked or signed out (its exports wait).
+    public var canRun: ((UUID) -> Bool)?
 
     public func retry(_ id: UUID) {
         update(id) { $0.state = .queued; $0.progress = 0; $0.message = nil; $0.bytes = 0 }
@@ -108,8 +120,8 @@ public final class ExportManager {
     public func pump() {
         let runningCount = jobs.filter { $0.state == .running }.count
         guard runningCount < maxConcurrent else { return }
-        // Oldest queued first.
-        guard let next = jobs.last(where: { $0.state == .queued }) else { return }
+        // Oldest queued first, only for devices Vedetta may connect to right now.
+        guard let next = jobs.last(where: { $0.state == .queued && (canRun?($0.deviceID) ?? true) }) else { return }
         start(next)
         pump()
     }
@@ -138,7 +150,8 @@ public final class ExportManager {
         update(job.id) { $0.state = .running; $0.message = L("Connecting to the recorder…") }
         let id = job.id
         let (jStart, jEnd) = (job.start, job.end)
-        let rs = ReplayStream(channel: channel, credentials: device.credentials, start: job.start, end: job.end) {
+        let rs = ReplayStream(channel: channel, credentials: device.credentials, start: job.start, end: job.end,
+                              accessGuard: DeviceClients.shared.accessGuard(for: device)) {
             try await PlaybackBackend.replayTargets(device: device, channel: channel, from: jStart, to: jEnd, export: true)
         }
         let total = max(1, job.end.timeIntervalSince(job.start))
@@ -146,6 +159,7 @@ public final class ExportManager {
         let jobEnd = job.end.timeIntervalSince1970
         let box = ExportBox()
         let url = job.fileURL
+        let withAudio = job.includeAudio ?? true
         // All recorder calls happen on the replay queue (AVAssetWriter is not thread-safe).
         rs.onAccessUnit = { [weak self] au, abs, format, audioInfo in
             guard !box.done else { return }
@@ -153,7 +167,7 @@ public final class ExportManager {
             if box.recorder == nil {
                 guard au.isKeyframe else { return }
                 do {
-                    box.recorder = try MP4Recorder(url: url, videoFormat: format, audio: audioInfo, realTime: false)
+                    box.recorder = try MP4Recorder(url: url, videoFormat: format, audio: withAudio ? audioInfo : nil, realTime: false)
                 } catch {
                     box.done = true
                     DispatchQueue.main.async { self?.finish(id: id, success: false, message: error.localizedDescription) }
@@ -177,9 +191,11 @@ public final class ExportManager {
                 }
             }
         }
-        rs.onAudioFrame = { au, abs, _ in
-            guard !box.done, abs <= jobEnd else { return }
-            box.recorder?.appendAudio(au, time: abs)
+        if withAudio {
+            rs.onAudioFrame = { au, abs, _ in
+                guard !box.done, abs <= jobEnd else { return }
+                box.recorder?.appendAudio(au, time: abs)
+            }
         }
         rs.onEnded = { [weak self] err in
             guard !box.done else { return }

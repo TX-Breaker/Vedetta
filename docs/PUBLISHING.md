@@ -44,6 +44,8 @@ fraction of the CPU used by Windows software under emulation.
 • Motion, person and vehicle events with notifications
 • PTZ control with saved positions
 • Automatic discovery of devices on your network
+• Safe for your recorder: one session, one login at a time, never a burst of retries that locks the user
+• Sign out and switch user; works with a dedicated view-only user
 • Passwords in the macOS Keychain — no accounts, no cloud, no tracking
 • English, Italian and French; follows your Mac's language
 
@@ -78,6 +80,8 @@ Windows in emulazione.
 • Eventi di movimento, persone e veicoli con notifiche
 • Controllo PTZ con posizioni salvate
 • Ricerca automatica dei dispositivi nella rete
+• Sicura per il registratore: una sessione, un accesso alla volta, mai raffiche di tentativi che bloccano l'utente
+• Esci e Cambia utente; funziona con un utente dedicato di sola visione
 • Password nel Portachiavi di macOS — nessun account, nessun cloud, nessun tracciamento
 • Italiano, inglese e francese; segue la lingua del Mac
 
@@ -111,6 +115,8 @@ Mac : seize caméras n'utilisent qu'une fraction du processeur requis par les lo
 • Événements de mouvement, personnes et véhicules avec notifications
 • Commande PTZ avec positions enregistrées
 • Détection automatique des appareils sur votre réseau
+• Sûre pour l'enregistreur : une session, une connexion à la fois, jamais de rafales de tentatives qui bloquent l'utilisateur
+• Se déconnecter et changer d'utilisateur ; fonctionne avec un utilisateur dédié en lecture seule
 • Mots de passe dans le trousseau de macOS — aucun compte, aucun cloud, aucun pistage
 • Français, anglais et italien ; suit la langue de votre Mac
 
@@ -124,15 +130,18 @@ Hikvision, Dahua, Reolink, Uniview, enregistreur vidéo, PTZ, direct, lecture
 
 **EN** — First public release of Vedetta: native live view, recordings with calendar and timeline, MP4
 export without re-encoding, events and notifications, PTZ, for TP-Link VIGI, ONVIF (any brand), Hikvision,
-Dahua, Reolink, Uniview and RTSP devices. English, Italian and French.
+Dahua, Reolink, Uniview and RTSP devices. Built-in protection against recorder account lockouts, sign out
+and switch user. English, Italian and French.
 
 **IT** — Prima versione pubblica di Vedetta: diretta nativa, registrazioni con calendario e timeline,
 esportazione MP4 senza ricodifica, eventi e notifiche, PTZ, per dispositivi TP-Link VIGI, ONVIF (qualsiasi
-marca), Hikvision, Dahua, Reolink, Uniview e RTSP. Italiano, inglese e francese.
+marca), Hikvision, Dahua, Reolink, Uniview e RTSP. Protezione integrata contro il blocco degli account del
+registratore, Esci e Cambia utente. Italiano, inglese e francese.
 
 **FR** — Première version publique de Vedetta : direct natif, enregistrements avec calendrier et chronologie,
 export MP4 sans réencodage, événements et notifications, PTZ, pour appareils TP-Link VIGI, ONVIF (toutes
-marques), Hikvision, Dahua, Reolink, Uniview et RTSP. Français, anglais et italien.
+marques), Hikvision, Dahua, Reolink, Uniview et RTSP. Protection intégrée contre le blocage des comptes de
+l'enregistreur, déconnexion et changement d'utilisateur. Français, anglais et italien.
 
 **Install note (all releases):** download the DMG, drag Vedetta to Applications. If the build is not
 notarized, right-click → Open the first time. Allow Local Network access when asked.

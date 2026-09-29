@@ -18,6 +18,9 @@ struct PlaybackView: View {
     @State private var viewCache = ViewCache()
     @State private var showExport = false
     @State private var pendingStart: Date?
+    @State private var showKeys = false
+    @State private var keyMonitor: Any?
+    @State private var hostWindow = WeakWindow()
 
     var body: some View {
         let channels = model.playbackChannels
@@ -48,9 +51,9 @@ struct PlaybackView: View {
             .sheet(isPresented: $showExport) {
                 ExportSheet(channels: selectedChannels, initialRange: clip ?? defaultExportRange)
             }
-            .onKeyPress(.space) { session?.togglePlay(); return .handled }
-            .onKeyPress(.leftArrow) { session?.jump(by: -10); return .handled }
-            .onKeyPress(.rightArrow) { session?.jump(by: 10); return .handled }
+            .onAppear { installKeys() }
+            .onDisappear { removeKeys() }
+            .background(WindowReader { hostWindow.window = $0 })
         }
     }
 
@@ -206,7 +209,8 @@ struct PlaybackView: View {
             Button(L("Export this event")) {
                 if let ch = model.channel(id: e.channelID), let d = model.device(for: ch) {
                     model.exports.enqueue(device: d, channel: ch, start: e.start.addingTimeInterval(-10),
-                                          end: e.end.addingTimeInterval(10), folder: model.settings.exportsURL)
+                                          end: e.end.addingTimeInterval(10), folder: model.settings.exportsURL,
+                                          includeAudio: model.settings.exportAudio)
                     model.toast(.info, L("Export added"), "\(e.info.name) · \(ch.name)")
                 }
             }
@@ -332,10 +336,12 @@ struct PlaybackView: View {
 
             HStack(spacing: 10) {
                 TimelineHost(session: session, day: day, lanes: lanes, events: visibleEvents,
-                             span: $span, center: $center, clip: $clip, clipMode: clipMode)
+                             span: $span, center: $center, clip: $clip, clipMode: clipMode,
+                             wheelZooms: model.settings.timelineWheel == .zoom)
                 .padding(.top, 16)
                 zoomPicker
             }
+            timelineControls
             if selectedChannels.contains(where: { model.index.unindexed.contains($0.id) }) {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle").foregroundStyle(.secondary)
@@ -346,6 +352,10 @@ struct PlaybackView: View {
             }
             if clipMode, let clip {
                 HStack {
+                    Button(L("Start here")) { setClipStart() }.buttonStyle(.glass).controlSize(.small)
+                        .help(L("Selection starts at the current time (I)"))
+                    Button(L("End here")) { setClipEnd() }.buttonStyle(.glass).controlSize(.small)
+                        .help(L("Selection ends at the current time (O)"))
                     Image(systemName: "scissors").foregroundStyle(Theme.accent)
                     Text(L("Selection: %@ – %@ · %@", Format.time.string(from: clip.lowerBound), Format.time.string(from: clip.upperBound), Format.duration(clip.upperBound.timeIntervalSince(clip.lowerBound))))
                         .font(.caption.monospacedDigit())
@@ -362,6 +372,123 @@ struct PlaybackView: View {
         selectedChannels.enumerated().map { i, ch in
             TimelineLane(channel: ch, color: Theme.channelColors[i % 4], segments: model.index.segments[ch.id] ?? [])
         }
+    }
+
+    /// Buttons for everything the wheel and the keyboard do (mouse only, one hand).
+    private var timelineControls: some View {
+        HStack(spacing: 8) {
+            Group {
+                smallButton("minus.magnifyingglass", L("Zoom out the timeline (–)")) { zoomTimeline(by: 2) }
+                smallButton("plus.magnifyingglass", L("Zoom in the timeline (+)")) { zoomTimeline(by: 0.5) }
+                smallButton("chevron.left", L("Move the timeline back")) { panTimeline(-1) }
+                smallButton("chevron.right", L("Move the timeline forward")) { panTimeline(1) }
+                smallButton("scope", L("Center on the playhead (C)")) { centerTimeline() }
+            }
+            Text(model.settings.timelineWheel == .zoom ? L("Mouse wheel: zoom · Shift + wheel: scroll") : L("Mouse wheel: scroll · ⌘ + wheel: zoom"))
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showKeys.toggle() } label: { Label(L("Keyboard shortcuts"), systemImage: "keyboard") }
+                .buttonStyle(.glass).controlSize(.small)
+                .popover(isPresented: $showKeys) { PlaybackShortcutsHelp() }
+        }
+    }
+
+    private func smallButton(_ symbol: String, _ help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol).frame(width: 18, height: 14) }
+            .buttonStyle(.glass).controlSize(.small)
+            .help(help)
+            .accessibilityLabel(help)
+    }
+
+    private func zoomTimeline(by factor: Double) {
+        withAnimation(.snappy) {
+            span = min(86400, max(60, span * factor))
+            centerTimeline(animated: false)
+        }
+    }
+
+    private func panTimeline(_ direction: Double) {
+        withAnimation(.snappy) {
+            let half = span / 2
+            center = min(max(center.addingTimeInterval(direction * span * 0.4), day.addingTimeInterval(half)), day.addingTimeInterval(86400 - half))
+        }
+    }
+
+    private func centerTimeline(animated: Bool = true) {
+        let half = span / 2
+        let t = session?.currentTime ?? center
+        let c = min(max(t, day.addingTimeInterval(half)), day.addingTimeInterval(86400 - half))
+        if animated { withAnimation(.snappy) { center = c } } else { center = c }
+    }
+
+    private func setClipStart() {
+        guard let t = session?.currentTime else { return }
+        withAnimation(.snappy) {
+            clipMode = true
+            let end = clip.map { max($0.upperBound, t.addingTimeInterval(1)) } ?? t.addingTimeInterval(max(60, span / 20))
+            clip = t...end
+        }
+    }
+
+    private func setClipEnd() {
+        guard let t = session?.currentTime else { return }
+        withAnimation(.snappy) {
+            clipMode = true
+            let start = clip.map { min($0.lowerBound, t.addingTimeInterval(-1)) } ?? t.addingTimeInterval(-max(60, span / 20))
+            clip = start...t
+        }
+    }
+
+    // MARK: Keyboard
+
+    private func installKeys() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            handleKey(event) ? nil : event
+        }
+    }
+
+    private func removeKeys() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+    }
+
+    /// Single keys, no chords (usable with one hand); ignored while typing or in another window/sheet.
+    func handleKey(_ event: NSEvent) -> Bool {
+        guard model.section == .playback, !selectedIDs.isEmpty, let w = event.window, w === hostWindow.window,
+              w.isKeyWindow, w.attachedSheet == nil, !(w.firstResponder is NSText) else { return false }
+        let mods = event.modifierFlags.intersection([.command, .control])
+        guard mods.isEmpty else { return false }
+        let shift = event.modifierFlags.contains(.shift)
+        let option = event.modifierFlags.contains(.option)
+        switch event.keyCode {
+        case 49: session?.togglePlay(); return true                                            // space
+        case 123: session?.jump(by: shift ? -60 : (option ? -1 : -10)); return true             // ←
+        case 124: session?.jump(by: shift ? 60 : (option ? 1 : 10)); return true                // →
+        case 126: jumpEvent(forward: false); return true                                        // ↑
+        case 125: jumpEvent(forward: true); return true                                         // ↓
+        case 53: if clipMode { withAnimation(.snappy) { clipMode = false; clip = nil } }; return clipMode   // esc
+        default: break
+        }
+        switch event.charactersIgnoringModifiers?.lowercased() ?? "" {
+        case "k": session?.togglePlay()
+        case "+", "=": zoomTimeline(by: 0.5)
+        case "-": zoomTimeline(by: 2)
+        case "0": withAnimation(.snappy) { span = 86400; center = day.addingTimeInterval(43200) }
+        case "c": centerTimeline()
+        case ".": session?.stepForward()
+        case "i": setClipStart()
+        case "o": setClipEnd()
+        case "s": snapshot()
+        case "e": showExport = true
+        case "1": session?.setSpeed(1)
+        case "2": session?.setSpeed(2)
+        case "4": session?.setSpeed(4)
+        case "8": session?.setSpeed(8)
+        case "h", "?": showKeys.toggle()
+        default: return false
+        }
+        return true
     }
 
     private var zoomPicker: some View {
@@ -456,12 +583,13 @@ struct PlaybackView: View {
 
     private func ensureSession() -> PlaybackSession? {
         guard let device = currentDevice else { session?.stop(); session = nil; return nil }
-        if let s = session, s.device.id == device.id { s.updateDevice(device); return s }
+        if let s = session, s.device.id == device.id { s.updateDevice(device); model.activePlayback = s; return s }
         session?.stop()
         let s = PlaybackSession(device: device, start: day)
         s.segmentsProvider = { [index = model.index] ch in index.intervals(for: ch) }
         s.onDeviceUpdated = { [weak model] d in model?.updateDevice(d) }
         session = s
+        model.activePlayback = s
         return s
     }
 
@@ -549,12 +677,66 @@ struct TimelineHost: View {
     @Binding var center: Date
     @Binding var clip: ClosedRange<Date>?
     let clipMode: Bool
+    var wheelZooms = true
     var body: some View {
         RecordingTimeline(dayStart: day, lanes: lanes, events: events,
                           current: session?.currentTime ?? day, span: $span, center: $center,
-                          clip: $clip, clipMode: clipMode) { t in
+                          clip: $clip, clipMode: clipMode, wheelZooms: wheelZooms) { t in
             session?.seek(to: t)
         }
+    }
+}
+
+final class WeakWindow { weak var window: NSWindow? }
+
+/// Reports the window hosting a view.
+struct WindowReader: NSViewRepresentable {
+    var onWindow: (NSWindow?) -> Void
+    func makeNSView(context: Context) -> NSView { Reader(onWindow) }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+    final class Reader: NSView {
+        let onWindow: (NSWindow?) -> Void
+        init(_ f: @escaping (NSWindow?) -> Void) { onWindow = f; super.init(frame: .zero) }
+        required init?(coder: NSCoder) { nil }
+        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); onWindow(window) }
+    }
+}
+
+/// List of the Recordings keyboard shortcuts (all single keys: usable with one hand).
+struct PlaybackShortcutsHelp: View {
+    var body: some View {
+        let rows: [(String, String)] = [
+            (L("Space or K"), L("Play / Pause")),
+            ("← →", L("Back / forward 10 seconds")),
+            ("⇧ ← →", L("Back / forward 1 minute")),
+            ("⌥ ← →", L("Back / forward 1 second")),
+            ("↑ ↓", L("Previous / next event")),
+            (".", L("Next frame")),
+            ("+ –", L("Zoom the timeline in / out")),
+            ("0", L("Whole day")),
+            ("C", L("Center the timeline on the playhead")),
+            ("I  O", L("Selection start / end at the current time")),
+            ("E", L("Save on this Mac")),
+            ("S", L("Snapshot")),
+            ("1 2 4 8", L("Playback speed")),
+            ("Esc", L("Cancel the selection")),
+        ]
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L("Keyboard shortcuts")).font(.headline)
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                ForEach(rows, id: \.0) { key, action in
+                    GridRow {
+                        Text(key).font(.system(.callout, design: .monospaced).weight(.semibold))
+                        Text(action).font(.callout)
+                    }
+                }
+            }
+            Divider()
+            Text(L("With the mouse only: the wheel over the timeline zooms around the pointer (Shift + wheel scrolls), a click jumps to that time, and the buttons under the timeline zoom, scroll and set the selection."))
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .frame(width: 420)
     }
 }
 

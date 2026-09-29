@@ -19,6 +19,8 @@ public struct RTSPResponse: Sendable {
 public enum RTSPError: LocalizedError, Sendable {
     case invalidURL
     case connectionFailed(String)
+    /// The device did not accept the TCP connection (down, unplugged, wrong address).
+    case unreachable(String)
     case timeout(String)
     case unauthorized
     case status(Int, String)
@@ -29,6 +31,7 @@ public enum RTSPError: LocalizedError, Sendable {
         switch self {
         case .invalidURL: return L("Invalid stream address")
         case .connectionFailed(let s): return L("Connection failed: %@", s)
+        case .unreachable(let s): return L("Device not reachable: %@", s)
         case .timeout(let what): return L("No response (%@)", what)
         case .unauthorized: return L("Wrong user name or password")
         case .status(let code, let reason): return L("Device error %@ %@", String(code), reason)
@@ -99,6 +102,10 @@ public final class RTSPClient: @unchecked Sendable {
     private var closed = false
     private var playing = false
     public private(set) var receivedBytes: Int = 0
+    private let acceptLock = NSLock()
+    private var _credentialsAccepted = false
+    /// True once the device answered a request carrying our credentials with something other than 401.
+    public var credentialsAccepted: Bool { acceptLock.withLock { _credentialsAccepted } }
 
     public init(options: Options, queue: DispatchQueue? = nil) {
         self.options = options
@@ -198,14 +205,21 @@ public final class RTSPClient: @unchecked Sendable {
     }
 
     /// Tears down the session and closes the socket. Safe to call multiple times.
+    /// (Holds the client until done: callers usually drop their reference right after calling stop.)
     public func stop() {
-        queue.async { [weak self] in
-            guard let self, !self.closed else { return }
+        queue.async { [self] in
+            guard !self.closed else { return }
             if self.sessionID != nil, let conn = self.connection {
                 let req = self.buildRequest("TEARDOWN", url: self.aggregateURL(sdpControl: self.storedSDPControl), headers: [:])
-                conn.send(content: req, completion: .contentProcessed { _ in })
+                // Keep the socket until TEARDOWN is out: otherwise the recorder keeps the session (and a stream
+                // slot) until it times out.
+                self.close(error: nil, notify: false, cancelConnection: false)
+                self.connection = nil   // deinit must not cut the TEARDOWN: the closures below own the socket
+                conn.send(content: req, completion: .contentProcessed { _ in conn.cancel() })
+                self.queue.asyncAfter(deadline: .now() + 1) { conn.cancel() }
+            } else {
+                self.close(error: nil, notify: false)
             }
-            self.close(error: nil, notify: false)
         }
     }
 
@@ -287,7 +301,7 @@ public final class RTSPClient: @unchecked Sendable {
                 guard !resumed else { return }
                 resumed = true
                 conn?.cancel()
-                cont.resume(throwing: RTSPError.timeout(L("connection to %@", "\(host):\(port)")))
+                cont.resume(throwing: RTSPError.unreachable(L("no response from %@", "\(host):\(port)")))
             }
             conn.stateUpdateHandler = { [weak self] state in
                 switch state {
@@ -301,7 +315,7 @@ public final class RTSPClient: @unchecked Sendable {
                         resumed = true
                         timeout.cancel()
                         conn.cancel()
-                        cont.resume(throwing: RTSPError.connectionFailed(err.localizedDescription))
+                        cont.resume(throwing: RTSPError.unreachable(err.localizedDescription))
                     } else {
                         self?.close(error: RTSPError.connectionFailed(err.localizedDescription), notify: true)
                     }
@@ -342,13 +356,13 @@ public final class RTSPClient: @unchecked Sendable {
         }
     }
 
-    private func close(error: Error?, notify: Bool) {
+    private func close(error: Error?, notify: Bool, cancelConnection: Bool = true) {
         guard !closed else { return }
         closed = true
         keepAliveTimer?.cancel()
         keepAliveTimer = nil
         connection?.stateUpdateHandler = nil
-        connection?.cancel()
+        if cancelConnection { connection?.cancel() }
         let failure = error ?? RTSPError.closed
         for (_, c) in pending { c.resume(throwing: failure) }
         pending.removeAll()
@@ -387,19 +401,22 @@ public final class RTSPClient: @unchecked Sendable {
                 }
             }
         }
+        if response.statusCode != 401, authenticator?.hasChallenge == true { acceptLock.withLock { _credentialsAccepted = true } }
         if response.statusCode == 401, allowAuthRetry {
             guard let auth = authenticator else { throw RTSPError.unauthorized }
             let challenges = response.headers(named: "WWW-Authenticate")
             let hadChallenge = auth.hasChallenge
+            let accepted = credentialsAccepted
             guard auth.update(withHeaders: challenges) else { throw RTSPError.unauthorized }
             let stale = challenges.contains { $0.lowercased().contains("stale=true") }
-            if hadChallenge && !stale {
-                // Credentials already sent and rejected; try once more with the fresh nonce.
-                let retry = try await request(method, url: url, headers: headers, allowAuthRetry: false)
-                if retry.statusCode == 401 { throw RTSPError.unauthorized }
-                return retry
+            if hadChallenge && !stale && !accepted {
+                // Credentials sent and refused: never repeat them (NVRs lock accounts after a few failures).
+                throw RTSPError.unauthorized
             }
-            return try await request(method, url: url, headers: headers, allowAuthRetry: false)
+            // First challenge, expired nonce, or a device that rotates nonces after accepting us.
+            let retry = try await request(method, url: url, headers: headers, allowAuthRetry: false)
+            if retry.statusCode == 401 { throw RTSPError.unauthorized }
+            return retry
         }
         return response
     }

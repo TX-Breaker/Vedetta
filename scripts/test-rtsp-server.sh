@@ -9,9 +9,18 @@ if [[ ! -f $CRED ]]; then
   echo "USER=vedetta" > $CRED
   echo "PASS=$(openssl rand -hex 8)" >> $CRED
 fi
+# Second, view-only user (switch-user tests).
+if ! grep -q "^VUSER=" $CRED; then
+  echo "VUSER=viewer" >> $CRED
+  echo "VPASS=$(openssl rand -hex 8)" >> $CRED
+fi
 source $CRED
 case "$1" in
 start)
+  # Idempotent: already running → nothing to do.
+  if [[ -f $DIR/mediamtx.pid ]] && pid=$(cat $DIR/mediamtx.pid) && [[ $pid =~ ^[0-9]+$ ]] && (( pid > 1 )) && kill -0 $pid 2>/dev/null; then
+    echo "already running"; exit 0
+  fi
   cat > $DIR/mediamtx.yml <<YML
 logLevel: warn
 rtspAddress: :8554
@@ -32,6 +41,11 @@ authInternalUsers:
     ips: ['127.0.0.1', '::1']
     permissions:
       - action: publish
+      - action: read
+  - user: $VUSER
+    pass: $VPASS
+    ips: ['127.0.0.1', '::1']
+    permissions:
       - action: read
 paths:
   all_others:

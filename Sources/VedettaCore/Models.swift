@@ -242,6 +242,49 @@ public enum GridKind: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
+/// How a video fits its tile.
+public enum TileFit: String, Codable, Sendable, CaseIterable, Identifiable {
+    /// Whole picture, black bars when the shapes differ.
+    case fit
+    /// Fills the tile, cropping the edges (may hide the camera's clock).
+    case fill
+    /// Fills the tile without cropping, stretching the picture (e.g. 4:3 sub-streams in 16:9 tiles).
+    case stretch
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .fit: return L("Whole picture (black bars)")
+        case .fill: return L("Fill (crop the edges)")
+        case .stretch: return L("Stretch (no cropping)")
+        }
+    }
+}
+
+/// When the camera name is shown on live tiles.
+public enum TileLabelMode: String, Codable, Sendable, CaseIterable, Identifiable {
+    case always, hover, never
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .always: return L("Always")
+        case .hover: return L("When the pointer is over the tile")
+        case .never: return L("Never")
+        }
+    }
+}
+
+/// What the mouse wheel does over the recordings timeline.
+public enum TimelineWheel: String, Codable, Sendable, CaseIterable, Identifiable {
+    case zoom, scroll
+    public var id: String { rawValue }
+    public var label: String {
+        switch self {
+        case .zoom: return L("Zoom (Shift + wheel scrolls)")
+        case .scroll: return L("Scroll (⌘ + wheel zooms)")
+        }
+    }
+}
+
 public struct AppSettings: Codable, Sendable, Equatable {
     public var snapshotsPath: String
     public var recordingsPath: String
@@ -253,8 +296,12 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var lockWithTouchID: Bool = false
     public var notificationsEnabled: Bool = true
     public var playLiveAudio: Bool = false
-    public var fillTiles: Bool = false
+    public var tileFit: TileFit = .fit
+    public var tileLabels: TileLabelMode = .always
     public var confirmBeforeQuit: Bool = false
+    /// Include the audio track when saving recordings from the recorder.
+    public var exportAudio: Bool = true
+    public var timelineWheel: TimelineWheel = .zoom
 
     public static var defaults: AppSettings {
         // Test runs keep their media inside the isolated support folder, never in ~/Movies or ~/Pictures.
@@ -279,4 +326,163 @@ public struct LiveLayout: Codable, Sendable, Equatable {
     public var slots: [String?] = []
     public var page: Int = 0
     public init() {}
+}
+
+// MARK: - Tolerant decoding
+// Settings files written by older or newer versions must never be discarded: every field falls back to its
+// default when missing or unreadable, instead of making the whole file unreadable.
+
+extension KeyedDecodingContainer {
+    func value<T: Decodable>(_ key: Key, _ fallback: @autoclosure () -> T) -> T {
+        ((try? decodeIfPresent(T.self, forKey: key)) ?? nil) ?? fallback()
+    }
+}
+
+extension AppSettings {
+    enum CodingKeys: String, CodingKey {
+        case snapshotsPath, recordingsPath, exportsPath, tourIntervalSeconds, liveQuality, showStreamInfo, keepInMenuBar,
+             lockWithTouchID, notificationsEnabled, playLiveAudio, tileFit, tileLabels, confirmBeforeQuit, exportAudio,
+             timelineWheel, fillTiles
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppSettings.defaults
+        self = d
+        snapshotsPath = c.value(.snapshotsPath, d.snapshotsPath)
+        recordingsPath = c.value(.recordingsPath, d.recordingsPath)
+        exportsPath = c.value(.exportsPath, d.exportsPath)
+        tourIntervalSeconds = c.value(.tourIntervalSeconds, d.tourIntervalSeconds)
+        liveQuality = c.value(.liveQuality, d.liveQuality)
+        showStreamInfo = c.value(.showStreamInfo, d.showStreamInfo)
+        keepInMenuBar = c.value(.keepInMenuBar, d.keepInMenuBar)
+        lockWithTouchID = c.value(.lockWithTouchID, d.lockWithTouchID)
+        notificationsEnabled = c.value(.notificationsEnabled, d.notificationsEnabled)
+        playLiveAudio = c.value(.playLiveAudio, d.playLiveAudio)
+        // 1.0 files had a "fill the tiles" switch.
+        tileFit = c.value(.tileFit, c.value(.fillTiles, false) ? TileFit.fill : d.tileFit)
+        tileLabels = c.value(.tileLabels, d.tileLabels)
+        confirmBeforeQuit = c.value(.confirmBeforeQuit, d.confirmBeforeQuit)
+        exportAudio = c.value(.exportAudio, d.exportAudio)
+        timelineWheel = c.value(.timelineWheel, d.timelineWheel)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(snapshotsPath, forKey: .snapshotsPath)
+        try c.encode(recordingsPath, forKey: .recordingsPath)
+        try c.encode(exportsPath, forKey: .exportsPath)
+        try c.encode(tourIntervalSeconds, forKey: .tourIntervalSeconds)
+        try c.encode(liveQuality, forKey: .liveQuality)
+        try c.encode(showStreamInfo, forKey: .showStreamInfo)
+        try c.encode(keepInMenuBar, forKey: .keepInMenuBar)
+        try c.encode(lockWithTouchID, forKey: .lockWithTouchID)
+        try c.encode(notificationsEnabled, forKey: .notificationsEnabled)
+        try c.encode(playLiveAudio, forKey: .playLiveAudio)
+        try c.encode(tileFit, forKey: .tileFit)
+        try c.encode(tileLabels, forKey: .tileLabels)
+        try c.encode(confirmBeforeQuit, forKey: .confirmBeforeQuit)
+        try c.encode(exportAudio, forKey: .exportAudio)
+        try c.encode(timelineWheel, forKey: .timelineWheel)
+    }
+}
+
+extension LiveLayout {
+    enum CodingKeys: String, CodingKey { case grid, slots, page }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        grid = c.value(.grid, .four)
+        slots = c.value(.slots, [])
+        page = c.value(.page, 0)
+    }
+}
+
+extension Channel {
+    enum CodingKeys: String, CodingKey {
+        case id, deviceID, number, name, mainURL, subURL, ptzProfile, isOnline, isHidden, supportsPlayback, sourceToken, recordingToken
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let deviceID = try c.decode(UUID.self, forKey: .deviceID)
+        let number = try c.decode(Int.self, forKey: .number)
+        self.init(deviceID: deviceID, number: number, name: c.value(.name, L("Channel %@", String(number))))
+        id = c.value(.id, id)
+        mainURL = c.value(.mainURL, nil)
+        subURL = c.value(.subURL, nil)
+        ptzProfile = c.value(.ptzProfile, nil)
+        isOnline = c.value(.isOnline, true)
+        isHidden = c.value(.isHidden, false)
+        supportsPlayback = c.value(.supportsPlayback, false)
+        sourceToken = c.value(.sourceToken, nil)
+        recordingToken = c.value(.recordingToken, nil)
+    }
+}
+
+extension Device {
+    enum CodingKeys: String, CodingKey {
+        case id, kind, name, host, httpPort, rtspPort, onvifURL, username, model, firmware, channels, addedAt, replayTimeSuffix, brand
+    }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try c.decode(DeviceKind.self, forKey: .kind)
+        let host = try c.decode(String.self, forKey: .host)
+        self.init(id: try c.decode(UUID.self, forKey: .id), kind: kind, name: c.value(.name, host), host: host,
+                  httpPort: c.value(.httpPort, kind == .vigiNVR ? 443 : 80), rtspPort: c.value(.rtspPort, 554),
+                  username: c.value(.username, ""))
+        onvifURL = c.value(.onvifURL, nil)
+        model = c.value(.model, nil)
+        firmware = c.value(.firmware, nil)
+        // A single unreadable channel must not lose the others.
+        if var list = try? c.nestedUnkeyedContainer(forKey: .channels) {
+            var out: [Channel] = []
+            while !list.isAtEnd {
+                if let ch = try? list.decode(Channel.self) { out.append(ch) } else { _ = try? list.decode(Skip.self) }
+            }
+            channels = out
+        }
+        addedAt = c.value(.addedAt, Date())
+        replayTimeSuffix = c.value(.replayTimeSuffix, nil)
+        brand = c.value(.brand, nil)
+    }
+}
+
+/// Consumes one element of an unkeyed container that could not be decoded.
+struct Skip: Decodable { init(from decoder: Decoder) throws {} }
+
+/// Everything about the app and the devices, without passwords (they stay in the Keychain).
+public struct SettingsBackup: Codable, Sendable {
+    public static let formatID = "it.vedetta.settings"
+    public var format = SettingsBackup.formatID
+    public var version = 1
+    public var appVersion: String
+    public var exportedAt: Date
+    public var settings: AppSettings
+    public var layout: LiveLayout
+    public var devices: [Device]
+    public var language: String?
+
+    public init(appVersion: String, settings: AppSettings, layout: LiveLayout, devices: [Device], language: String?) {
+        self.appVersion = appVersion
+        self.exportedAt = Date()
+        self.settings = settings
+        self.layout = layout
+        self.devices = devices
+        self.language = language
+    }
+
+    public func encoded() throws -> Data {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try e.encode(self)
+    }
+
+    public static func decode(_ data: Data) throws -> SettingsBackup {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        let b = try d.decode(SettingsBackup.self, from: data)
+        guard b.format == formatID else { throw CocoaError(.fileReadCorruptFile) }
+        return b
+    }
 }

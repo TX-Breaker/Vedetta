@@ -2,6 +2,7 @@ import Foundation
 import UserNotifications
 import VedettaCore
 import VigiKit
+import ONVIFKit
 import VedettaL10n
 
 /// Polls the NVR for new detection events and posts macOS notifications.
@@ -12,6 +13,8 @@ final class EventMonitor {
     private var seen = Set<String>()
     private var lastCheck = Date()
     private var running = false
+    /// Devices whose user may not read events (checked once per session).
+    private var noEventAccess = Set<UUID>()
 
     init(model: AppModel) { self.model = model }
 
@@ -51,19 +54,31 @@ final class EventMonitor {
             var candidates: [(Channel, Int, Date)] = []
             func add(_ ch: Channel, _ type: Int, _ start: Date) { candidates.append((ch, type, start)) }
             for d in vigi {
+                // Offline, refused, locked or signed out: skip (never a login from here).
+                guard DeviceClients.shared.state(of: d).isUsable else { continue }
                 let client = DeviceClients.shared.vigi(for: d)
                 for ch in d.visibleChannels where ch.isOnline {
-                    guard let evs = try? await client.events(channel: ch.number, from: from, to: to) else { continue }
-                    for e in evs { add(ch, e.eventType, e.start) }
+                    do {
+                        for e in try await client.events(channel: ch.number, from: from, to: to) { add(ch, e.eventType, e.start) }
+                    } catch {
+                        break   // one failure is enough for this round
+                    }
                 }
             }
             // Other brands: detections stored with the ONVIF recordings (Profile G).
-            for d in onvif {
-                guard let client = DeviceClients.shared.onvif(for: d) else { continue }
+            for d in onvif where !self.noEventAccess.contains(d.id) {
+                guard DeviceClients.shared.state(of: d).isUsable, let client = DeviceClients.shared.onvif(for: d) else { continue }
                 for ch in d.visibleChannels {
-                    guard let token = ch.recordingToken,
-                          let raw = try? await client.findEvents(recording: token, from: from, to: to, maxMatches: 200) else { continue }
-                    for e in PlaybackBackend.detections(raw, channelID: ch.id) { add(ch, e.type, e.start) }
+                    guard let token = ch.recordingToken else { continue }
+                    do {
+                        let raw = try await client.findEvents(recording: token, from: from, to: to, maxMatches: 200)
+                        for e in PlaybackBackend.detections(raw, channelID: ch.id) { add(ch, e.type, e.start) }
+                    } catch ONVIFError.notPermitted {
+                        self.noEventAccess.insert(d.id)   // this user may not search recordings: stop asking
+                        break
+                    } catch {
+                        break
+                    }
                 }
             }
             var fresh: [(Channel, Int, Date)] = []

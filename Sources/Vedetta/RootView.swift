@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import LocalAuthentication
 import VedettaCore
+import NetKit
 import VedettaL10n
 
 struct RootView: View {
@@ -16,6 +17,10 @@ struct RootView: View {
             } else if !model.credentialsReady {
                 KeychainWaitView()
                     .transition(.opacity)
+            } else if model.everyDeviceNeedsSignIn {
+                // Refused/locked/signed out and nothing else to show: straight to the sign-in screen.
+                SignInScreen()
+                    .transition(.opacity)
             } else {
                 MainView()
                     .transition(.opacity)
@@ -24,8 +29,12 @@ struct RootView: View {
             if model.isLocked { LockView().transition(.opacity) }
         }
         .animation(.easeInOut(duration: 0.35), value: model.hasDevices)
+        .animation(.easeInOut(duration: 0.35), value: model.everyDeviceNeedsSignIn)
         .background(WindowObserver())
         .sheet(isPresented: $model.showAddDevice) { AddDeviceSheet() }
+        .sheet(item: Binding(get: { model.everyDeviceNeedsSignIn ? nil : model.signIn }, set: { model.signIn = $0 })) { req in
+            SignInView(deviceID: req.deviceID, clearUser: req.clearUser, inSheet: true)
+        }
         .tint(Theme.accent)
     }
 }
@@ -51,6 +60,8 @@ struct MainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .safeAreaInset(edge: .top, spacing: 0) { AccessBanner() }
+            .animation(.snappy, value: model.access)
         }
     }
 }

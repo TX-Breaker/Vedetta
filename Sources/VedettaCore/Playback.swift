@@ -4,12 +4,15 @@ import Observation
 import RTSPKit
 import MediaKit
 import VigiKit
+import NetKit
 import VedettaL10n
 
 /// One channel of NVR playback: RTSP replay → samples stamped with absolute time (seconds since 1970).
 final class ReplayStream: @unchecked Sendable {
     let channel: Channel
     private let credentials: Credentials
+    private let accessGuard: AccessGuard?
+    private var guardObserver: UUID?
     let start: Date
     let end: Date
     private let scale: Double?
@@ -43,9 +46,10 @@ final class ReplayStream: @unchecked Sendable {
     private var firstFrameSent = false
 
     init(channel: Channel, credentials: Credentials, start: Date, end: Date, scale: Double? = nil,
-         targets: @escaping @Sendable () async throws -> [ReplayTarget]) {
+         accessGuard: AccessGuard? = nil, targets: @escaping @Sendable () async throws -> [ReplayTarget]) {
         self.channel = channel
         self.credentials = credentials
+        self.accessGuard = accessGuard
         self.start = start
         self.end = end
         self.scale = scale
@@ -57,6 +61,19 @@ final class ReplayStream: @unchecked Sendable {
     func detachAll() { queue.async { self.sinks.removeAll() } }
 
     func begin() {
+        if let g = accessGuard {
+            // Refused credentials, locked account or sign out: close the stream at once.
+            guardObserver = g.observe { [weak self] state in
+                guard state.needsUser, let self else { return }
+                self.queue.async {
+                    guard !self.stopped else { return }
+                    self.stopped = true
+                    self.client?.stop()
+                    self.client = nil
+                    self.onEnded?(AccessBlocked(state: state))
+                }
+            }
+        }
         Task { [weak self] in
             guard let self else { return }
             do {
@@ -98,16 +115,27 @@ final class ReplayStream: @unchecked Sendable {
             guard let self, !self.stopped else { return }
             self.onEnded?(err)
         }
+        let g = accessGuard
+        let title = channel.name
         Task { [weak self] in
             do {
-                try await c.start()
+                if let g {
+                    try await g.credentialed("RTSP replay \(title)", important: false, { try await c.start() }) { r in
+                        LiveStream.outcome(r, client: c)
+                    }
+                } else {
+                    try await c.start()
+                }
                 self?.queue.async { self?.onTargetWorked?(target.tag) }
             } catch {
                 guard let self else { return }
                 self.queue.async {
                     guard !self.stopped else { return }
                     c.stop()
+                    // Never try the other addresses with credentials that were just refused, nor when blocked/offline.
                     if case RTSPError.unauthorized = error { self.onEnded?(error); return }
+                    if case RTSPError.unreachable = error { self.onEnded?(error); return }
+                    if error is AccessBlocked { self.onEnded?(error); return }
                     self.open(targets, index: index + 1, lastError: error)
                 }
             }
@@ -126,6 +154,7 @@ final class ReplayStream: @unchecked Sendable {
 
     /// Stops the stream; `then` runs on the stream queue after the last sample was delivered.
     func stop(then: (@Sendable () -> Void)? = nil) {
+        if let o = guardObserver { accessGuard?.removeObserver(o); guardObserver = nil }
         queue.async {
             self.stopped = true
             self.client?.stop()
@@ -257,7 +286,8 @@ public final class PlaybackSession {
         generation += 1
         let gen = generation
         for ch in channels {
-            let rs = ReplayStream(channel: ch, credentials: creds, start: start, end: end, scale: scale) {
+            let rs = ReplayStream(channel: ch, credentials: creds, start: start, end: end, scale: scale,
+                                  accessGuard: DeviceClients.shared.accessGuard(for: dev)) {
                 try await PlaybackBackend.replayTargets(device: dev, channel: ch, from: start, to: end, export: false)
             }
             let id = ch.id
@@ -308,6 +338,13 @@ public final class PlaybackSession {
 
     private func streamEnded(channelID: String, error: Error?) {
         guard streams[channelID] != nil else { return }
+        if let blocked = error as? AccessBlocked {
+            // Signed out, refused or locked: stop everything and say why.
+            stop()
+            notice = blocked.localizedDescription
+            isBuffering = false
+            return
+        }
         endedChannels.insert(channelID)
         if let error, !clockStarted {
             notice = error.localizedDescription

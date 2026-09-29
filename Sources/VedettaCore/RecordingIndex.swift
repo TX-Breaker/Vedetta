@@ -4,36 +4,6 @@ import VigiKit
 import ONVIFKit
 import VedettaL10n
 
-/// Caches one API client per device so logins are reused.
-@MainActor
-public final class DeviceClients {
-    public static let shared = DeviceClients()
-    private var vigi: [UUID: VigiClient] = [:]
-    private var onvif: [UUID: ONVIFClient] = [:]
-
-    public func vigi(for d: Device) -> VigiClient {
-        if let c = vigi[d.id], c.host == d.host, c.port == d.httpPort { return c }
-        let creds = d.credentials
-        let c = VigiClient(host: d.host, port: d.httpPort, username: creds.username, password: creds.password)
-        vigi[d.id] = c
-        return c
-    }
-
-    public func onvif(for d: Device) -> ONVIFClient? {
-        guard let s = d.onvifURL, let url = URL(string: s) else { return nil }
-        if let c = onvif[d.id], c.deviceURL == url { return c }
-        let creds = d.credentials
-        let c = ONVIFClient(deviceURL: url, username: creds.username, password: creds.password)
-        onvif[d.id] = c
-        return c
-    }
-
-    public func invalidate(_ id: UUID) {
-        vigi[id] = nil
-        onvif[id] = nil
-    }
-}
-
 public struct TimelineSegment: Hashable, Sendable {
     public enum Kind: Int, Sendable { case continuous = 1, event = 2, alarm = 3 }
     public var start: Date

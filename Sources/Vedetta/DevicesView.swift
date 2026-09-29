@@ -57,7 +57,7 @@ final class ConnectFormModel {
     var onvifURL = ""
     var rtspURL = ""
     var name = ""
-    var username = "admin"
+    var username = ""
     var password = ""
     var isConnecting = false
     var error: String?
@@ -93,6 +93,7 @@ final class ConnectFormModel {
 
     var canConnect: Bool {
         guard !isConnecting, !password.isEmpty || choice == .rtsp else { return false }
+        guard !username.trimmingCharacters(in: .whitespaces).isEmpty || choice == .rtsp else { return false }
         switch choice {
         case .vigi, .otherRecorder: return !address.trimmingCharacters(in: .whitespaces).isEmpty
         case .camera: return !address.trimmingCharacters(in: .whitespaces).isEmpty || !onvifURL.isEmpty
@@ -106,24 +107,26 @@ final class ConnectFormModel {
         defer { isConnecting = false }
         let id = editing?.id ?? UUID()
         let user = username.trimmingCharacters(in: .whitespaces)
+        // Existing device: its guard serializes this attempt with the automatic ones (one login at a time).
+        let g = editing.map { DeviceClients.shared.accessGuard(for: $0) }
         do {
             var result: ConnectResult
             switch choice {
             case .vigi:
                 result = try await DeviceConnector.connectNVR(address: address, httpPort: Int(httpPort) ?? 443, rtspPort: Int(rtspPort) ?? 554,
-                                                              username: user, password: password, id: id)
+                                                              username: user, password: password, id: id, accessGuard: g)
             case .otherRecorder:
                 result = try await DeviceConnector.connectRecorder(address: address, onvifURL: onvifURL.isEmpty ? nil : onvifURL,
                                                                    brand: brand == .vigi ? nil : brand, rtspPort: Int(rtspPort) ?? 554,
-                                                                   username: user, password: password, id: id)
+                                                                   username: user, password: password, id: id, accessGuard: g)
             case .camera:
                 let url = URL(string: onvifURL).flatMap { $0.host == nil ? nil : $0 }
                     ?? URL(string: "http://\(address.trimmingCharacters(in: .whitespaces))/onvif/device_service")
                 guard let url else { throw ConnectError.invalidAddress }
-                result = try await DeviceConnector.connectONVIF(url: url, username: user, password: password, id: id)
+                result = try await DeviceConnector.connectONVIF(url: url, username: user, password: password, id: id, accessGuard: g)
             case .rtsp:
                 guard let url = URL(string: rtspURL) else { throw ConnectError.invalidAddress }
-                result = try await DeviceConnector.connectRTSP(url: url, name: name, username: user, password: password, id: id)
+                result = try await DeviceConnector.connectRTSP(url: url, name: name, username: user, password: password, id: id, accessGuard: g)
             }
             if let editing {
                 result.device.name = editing.name
@@ -187,7 +190,13 @@ struct ConnectFields: View {
                 }
                 GridRow {
                     Text(L("User")).foregroundStyle(.secondary)
-                    TextField("admin", text: $form.username).textFieldStyle(.roundedBorder).textContentType(.username)
+                    TextField(L("e.g. vedetta"), text: $form.username).textFieldStyle(.roundedBorder).textContentType(.username)
+                }
+                if form.choice != .rtsp {
+                    GridRow {
+                        Color.clear.frame(width: 1, height: 1)
+                        DedicatedUserHint(username: form.username)
+                    }
                 }
                 GridRow {
                     Text(L("Password")).foregroundStyle(.secondary)
@@ -324,7 +333,7 @@ struct AddDeviceSheet: View {
                     }
                     Spacer()
                     Button(L("Cancel")) { dismiss() }.buttonStyle(.glass).keyboardShortcut(.cancelAction)
-                    Button(editing == nil ? "Connetti" : L("Save")) {
+                    Button(editing == nil ? L("Connect") : L("Save")) {
                         Task {
                             if let r = await form.connect() {
                                 model.addOrUpdate(r, password: form.password)
@@ -435,9 +444,23 @@ struct DevicesView: View {
                                 .help(L("Open the device web interface (all settings)"))
                         }
                         Button { editing = d } label: { Image(systemName: "pencil") }.help(L("Edit credentials"))
+                        Menu {
+                            Button(L("Switch User…")) { AccountActions.confirm(.switchUser, device: d, model: model) }
+                            Button(L("Sign Out…")) { AccountActions.confirm(.signOut, device: d, model: model) }
+                        } label: {
+                            Image(systemName: "person.crop.circle")
+                        }
+                        .menuIndicator(.hidden)
+                        .help(L("User: %@", d.username))
                         Button(role: .destructive) { confirmRemove = d } label: { Image(systemName: "trash") }.help(L("Remove"))
                     }
                     .buttonStyle(.glass)
+                }
+                let state = model.accessState(d)
+                if state.needsUser || state.isOffline {
+                    AccessNotice(state: state)
+                } else if isAdministratorName(d.username) {
+                    DedicatedUserHint(username: d.username)
                 }
                 Divider()
                 VStack(spacing: 0) {

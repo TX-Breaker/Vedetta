@@ -132,7 +132,6 @@ Automatic tour	Giro automatico	Rotation automatique
 Stop the automatic page tour	Ferma il giro automatico delle pagine	Arrêter la rotation automatique des pages
 Scroll through pages automatically every %@ seconds	Scorri automaticamente le pagine ogni %@ secondi	Faire défiler les pages automatiquement toutes les %@ secondes
 Video quality	Qualità video	Qualité vidéo
-Fill the tiles	Riempi i riquadri	Remplir les cases
 Show video information	Mostra informazioni video	Afficher les informations vidéo
 Quality	Qualità	Qualité
 Video quality and appearance	Qualità e aspetto del video	Qualité et apparence de la vidéo
@@ -142,7 +141,6 @@ or drag it here	oppure trascinala qui	ou faites-la glisser ici
 Choose the camera	Scegli la telecamera	Choisissez la caméra
 Audio	Audio	Audio
 Stop recording	Ferma registrazione	Arrêter l'enregistrement
-Record on this Mac	Registra sul Mac	Enregistrer sur ce Mac
 PTZ control	Controllo PTZ	Commande PTZ
 Back to grid	Torna alla griglia	Retour à la grille
 Enlarge	Ingrandisci	Agrandir
@@ -318,7 +316,6 @@ Notifications for motion, people and vehicles	Notifiche per movimento, persone e
 Vedetta checks the recorder events every minute and notifies you. Click the notification to review the moment.	Vedetta controlla gli eventi del registratore ogni minuto e ti avvisa. Clicca la notifica per rivedere il momento.	Vedetta vérifie les événements de l'enregistreur chaque minute et vous avertit. Cliquez sur la notification pour revoir le moment.
 Lock the app with Touch ID or your Mac password	Blocca l'app con Touch ID o password del Mac	Verrouiller l'app avec Touch ID ou le mot de passe du Mac
 “Automatic” uses the light stream in small tiles and high quality when you enlarge: it uses less network and CPU.	«Automatica» usa il flusso leggero nei riquadri piccoli e l'alta qualità quando ingrandisci: consuma meno rete e CPU.	« Automatique » utilise le flux léger dans les petites cases et la haute qualité quand vous agrandissez : moins de réseau et de CPU.
-Fill the tiles (crop the edges)	Riempi i riquadri (ritaglia i bordi)	Remplir les cases (rogner les bords)
 Show codec, resolution and bitrate	Mostra codec, risoluzione e bitrate	Afficher le codec, la résolution et le débit
 Automatic tour every %@ seconds	Giro automatico ogni %@ secondi	Rotation automatique toutes les %@ secondes
 Live recordings	Registrazioni dal vivo	Enregistrements en direct
@@ -384,7 +381,6 @@ No response (%@)	Nessuna risposta (%@)	Aucune réponse (%@)
 Device error %@ %@	Errore del dispositivo %@ %@	Erreur de l'appareil %@ %@
 Unsupported video format	Formato video non supportato	Format vidéo non pris en charge
 Connection closed by the device	Connessione chiusa dal dispositivo	Connexion fermée par l'appareil
-connection to %@	connessione a %@	connexion à %@
 Cannot create the video file: %@	Impossibile creare il file video: %@	Impossible de créer le fichier vidéo : %@
 video track not supported	traccia video non supportata	piste vidéo non prise en charge
 unknown error	errore sconosciuto	erreur inconnue
@@ -397,3 +393,124 @@ No video signal	Nessun segnale video	Aucun signal vidéo
 # --- Info.plist
 Vedetta connects to the recorder and cameras on your network to show you live video and recordings.	Vedetta si collega al registratore e alle telecamere della tua rete per mostrarti il video in diretta e le registrazioni.	Vedetta se connecte à l'enregistreur et aux caméras de votre réseau pour afficher la vidéo en direct et les enregistrements.
 offline	offline	hors ligne
+%@ attempts left before the recorder locks the user.	%@ tentativi rimasti prima che il registratore blocchi l'utente.	%@ tentatives restantes avant que l'enregistreur ne bloque l'utilisateur.
+Access to this camera was refused: check the user's permissions on the recorder.	Accesso a questa telecamera rifiutato: controlla i permessi dell'utente sul registratore.	Accès à cette caméra refusé : vérifiez les autorisations de l'utilisateur sur l'enregistreur.
+Accounts	Account	Comptes
+Add another device…	Aggiungi un altro dispositivo…	Ajouter un autre appareil…
+Check Now	Verifica ora	Vérifier maintenant
+Connected	Connesso	Connecté
+Connection log	Registro connessioni	Journal des connexions
+Create a user just for Vedetta on the recorder with live view and playback permissions only, and sign in with it here. Vedetta never retries a refused password, but a separate user also keeps the admin account and the recorder's own apps unaffected.	Crea sul registratore un utente solo per Vedetta, con i soli permessi di diretta e riproduzione, e accedi con quello. Vedetta non ripete mai una password rifiutata, ma un utente separato lascia comunque al sicuro l'account admin e le app del registratore.	Créez sur l'enregistreur un utilisateur réservé à Vedetta, avec uniquement les droits de direct et de lecture, et connectez-vous avec lui ici. Vedetta ne réessaie jamais un mot de passe refusé, mais un utilisateur séparé protège aussi le compte admin et les applications de l'enregistreur.
+Dedicated user	Utente dedicato	Utilisateur dédié
+Device	Dispositivo	Appareil
+Every connection attempt is recorded on this Mac with time, result and error code, to understand what happened. Passwords are never written.	Ogni tentativo di connessione viene registrato su questo Mac con ora, esito e codice di errore, per capire cosa è successo. Le password non vengono mai scritte.	Chaque tentative de connexion est enregistrée sur ce Mac avec l'heure, le résultat et le code d'erreur, pour comprendre ce qui s'est passé. Les mots de passe ne sont jamais écrits.
+Interrupted: signed out of the recorder	Interrotta: uscita dal registratore	Interrompu : déconnecté de l'enregistreur
+Logins, checks and errors	Accessi, verifiche ed errori	Connexions, vérifications et erreurs
+No device yet.	Nessun dispositivo.	Aucun appareil pour l'instant.
+Not Now	Non ora	Plus tard
+Not reachable	Non raggiungibile	Injoignable
+Not recommended: create a dedicated user on the recorder with view-only permissions (live view and playback). If the admin account got locked you would also lose the recorder management.	Sconsigliato: crea sul registratore un utente dedicato con soli permessi di visione (diretta e riproduzione). Se l'account admin venisse bloccato perderesti anche la gestione del registratore.	Déconseillé : créez sur l'enregistreur un utilisateur dédié avec des droits de visualisation uniquement (direct et lecture). Si le compte admin était bloqué, vous perdriez aussi la gestion de l'enregistreur.
+Nothing has been recorded yet.	Non è stato ancora registrato nulla.	Rien n'a encore été enregistré.
+One new attempt with the saved password	Un nuovo tentativo con la password salvata	Une nouvelle tentative avec le mot de passe enregistré
+Password missing	Password mancante	Mot de passe manquant
+Password refused	Password rifiutata	Mot de passe refusé
+Recorder not reachable. Vedetta checks again at %@, without sending the password.	Registratore non raggiungibile. Vedetta ricontrolla alle %@, senza inviare la password.	Enregistreur injoignable. Vedetta vérifie de nouveau à %@, sans envoyer le mot de passe.
+Recorder not responding. Next attempt at %@.	Il registratore non risponde. Prossimo tentativo alle %@.	L'enregistreur ne répond pas. Prochaine tentative à %@.
+Sign In	Accedi	Se connecter
+Sign In…	Accedi…	Se connecter…
+Sign Out	Esci	Se déconnecter
+Sign Out of %@…	Esci da %@…	Se déconnecter de %@…
+Sign Out…	Esci…	Se déconnecter…
+Sign in to %@	Accedi a %@	Connexion à %@
+Sign out of %@?	Uscire da %@?	Se déconnecter de %@ ?
+Signed out	Disconnesso	Déconnecté
+Signed out of the recorder.	Sei uscito dal registratore.	Déconnecté de l'enregistreur.
+Switch User	Cambia utente	Changer d'utilisateur
+Switch User…	Cambia utente…	Changer d'utilisateur…
+Switch the user of %@?	Cambiare l'utente di %@?	Changer l'utilisateur de %@ ?
+The device refused the user name or password (ONVIF).	Il dispositivo ha rifiutato nome utente o password (ONVIF).	L'appareil a refusé le nom d'utilisateur ou le mot de passe (ONVIF).
+The device refused the user name or password (ONVIF). Automatic attempts are stopped to avoid locking the account.	Il dispositivo ha rifiutato nome utente o password (ONVIF). I tentativi automatici sono sospesi per evitare il blocco dell'account.	L'appareil a refusé le nom d'utilisateur ou le mot de passe (ONVIF). Les tentatives automatiques sont suspendues pour éviter le blocage du compte.
+The device refused the user name or password (video).	Il dispositivo ha rifiutato nome utente o password (video).	L'appareil a refusé le nom d'utilisateur ou le mot de passe (vidéo).
+The log is empty	Il registro è vuoto	Le journal est vide
+The recorder closed the session: the same user is probably signed in from another app. Use a dedicated user for Vedetta.	Il registratore ha chiuso la sessione: probabilmente lo stesso utente è collegato da un'altra app. Usa un utente dedicato per Vedetta.	L'enregistreur a fermé la session : le même utilisateur est probablement connecté depuis une autre app. Utilisez un utilisateur dédié pour Vedetta.
+The recorder locked this user after too many attempts.	Il registratore ha bloccato questo utente dopo troppi tentativi.	L'enregistreur a bloqué cet utilisateur après trop de tentatives.
+The recorder locked this user after too many attempts. Vedetta will not try again by itself.	Il registratore ha bloccato questo utente dopo troppi tentativi. Vedetta non riproverà da sola.	L'enregistreur a bloqué cet utilisateur après trop de tentatives. Vedetta ne réessaiera pas d'elle-même.
+The recorder locked this user after too many attempts. Vedetta will try once more at %@.	Il registratore ha bloccato questo utente dopo troppi tentativi. Vedetta farà un solo nuovo tentativo alle %@.	L'enregistreur a bloqué cet utilisateur après trop de tentatives. Vedetta fera une seule nouvelle tentative à %@.
+The recorder refused the user name or password (%@ attempts left before the lock). Automatic attempts are stopped.	Il registratore ha rifiutato nome utente o password (%@ tentativi rimasti prima del blocco). I tentativi automatici sono sospesi.	L'enregistreur a refusé le nom d'utilisateur ou le mot de passe (%@ tentatives restantes avant le blocage). Les tentatives automatiques sont suspendues.
+The recorder refused the user name or password for the video. Automatic attempts are stopped to avoid locking the account.	Il registratore ha rifiutato nome utente o password per il video. I tentativi automatici sono sospesi per evitare il blocco dell'account.	L'enregistreur a refusé le nom d'utilisateur ou le mot de passe pour la vidéo. Les tentatives automatiques sont suspendues pour éviter le blocage du compte.
+The recorder refused the user name or password. Automatic attempts are stopped to avoid locking the account.	Il registratore ha rifiutato nome utente o password. I tentativi automatici sono sospesi per evitare il blocco dell'account.	L'enregistreur a refusé le nom d'utilisateur ou le mot de passe. Les tentatives automatiques sont suspendues pour éviter le blocage du compte.
+The saved password is not available. Sign in again.	La password salvata non è disponibile. Accedi di nuovo.	Le mot de passe enregistré n'est pas disponible. Reconnectez-vous.
+This user is not allowed to do this. Give it more permissions on the device.	Questo utente non ha il permesso per questa operazione. Assegnagli più permessi sul dispositivo.	Cet utilisateur n'a pas le droit de faire cela. Donnez-lui plus d'autorisations sur l'appareil.
+Tip: a dedicated user with view-only permissions keeps the admin account safe.	Consiglio: un utente dedicato con soli permessi di visione tiene al sicuro l'account admin.	Conseil : un utilisateur dédié avec des droits de visualisation uniquement protège le compte admin.
+To unlock it now, use the recorder's own screen or restart it; the recorder may also sound its buzzer for failed logins.	Per sbloccarlo subito usa lo schermo collegato al registratore oppure riavvialo; il registratore può anche far suonare il cicalino per gli accessi falliti.	Pour le débloquer tout de suite, utilisez l'écran branché sur l'enregistreur ou redémarrez-le ; l'enregistreur peut aussi faire sonner son buzzer après des connexions échouées.
+Try Again	Riprova	Réessayer
+User locked	Utente bloccato	Utilisateur bloqué
+User: %@	Utente: %@	Utilisateur : %@
+VIGI recorders: in the settings (web interface or local screen) open user management and add a user. Other brands: the same in the web interface (for ONVIF, an “Operator” or “User” level).	Registratori VIGI: nelle impostazioni (interfaccia web o schermo locale) apri la gestione utenti e aggiungi un utente. Altre marche: lo stesso nell'interfaccia web (per ONVIF, livello «Operator» o «User»).	Enregistreurs VIGI : dans les réglages (interface web ou écran local), ouvrez la gestion des utilisateurs et ajoutez un utilisateur. Autres marques : de même dans l'interface web (pour ONVIF, niveau « Operator » ou « User »).
+Vedetta closes the video, ends the session on the recorder and deletes the saved password. You can then sign in with another address, user or password.	Vedetta chiude il video, termina la sessione sul registratore e cancella la password salvata. Poi potrai accedere con un altro indirizzo, utente o password.	Vedetta ferme la vidéo, met fin à la session sur l'enregistreur et supprime le mot de passe enregistré. Vous pourrez ensuite vous connecter avec une autre adresse, un autre utilisateur ou un autre mot de passe.
+Vedetta first signs out completely (video closed, session ended on the recorder, password deleted), then asks for the new user.	Vedetta prima esce completamente (video chiuso, sessione terminata sul registratore, password cancellata), poi chiede il nuovo utente.	Vedetta se déconnecte d'abord complètement (vidéo fermée, session terminée sur l'enregistreur, mot de passe supprimé), puis demande le nouvel utilisateur.
+Vedetta never repeats a refused password by itself and makes one attempt at a time, so the recorder does not lock the user.	Vedetta non ripete mai da sola una password rifiutata e fa un solo tentativo alla volta, così il registratore non blocca l'utente.	Vedetta ne répète jamais d'elle-même un mot de passe refusé et fait une seule tentative à la fois, pour que l'enregistreur ne bloque pas l'utilisateur.
+Vedetta stopped connecting to %@	Vedetta ha sospeso i collegamenti a %@	Vedetta a suspendu les connexions à %@
+Vedetta will not try again: wait, or unlock the user on the recorder.	Vedetta non riproverà: attendi, oppure sblocca l'utente sul registratore.	Vedetta ne réessaiera pas : patientez ou débloquez l'utilisateur sur l'enregistreur.
+You are using an administrator account. A dedicated user with view-only permissions is safer: if the account gets locked you also lose the recorder management.	Stai usando un account amministratore. Un utente dedicato con soli permessi di visione è più sicuro: se l'account venisse bloccato perderesti anche la gestione del registratore.	Vous utilisez un compte administrateur. Un utilisateur dédié avec des droits de visualisation uniquement est plus sûr : si le compte était bloqué, vous perdriez aussi la gestion de l'enregistreur.
+e.g. vedetta	es. vedetta	ex. vedetta
+no response from %@	nessuna risposta da %@	aucune réponse de %@
+no stream answered	nessun flusso ha risposto	aucun flux n'a répondu
+%@ devices	%@ dispositivi	%@ appareils
+%@ — full quality (%@), saved on this Mac	%@ — qualità massima (%@), salvata su questo Mac	%@ — qualité maximale (%@), enregistré sur ce Mac
+All settings and devices	Tutte le impostazioni e i dispositivi	Tous les réglages et les appareils
+Always	Sempre	Toujours
+Back / forward 1 minute	Indietro / avanti di 1 minuto	Reculer / avancer d'1 minute
+Back / forward 1 second	Indietro / avanti di 1 secondo	Reculer / avancer d'1 seconde
+Back / forward 10 seconds	Indietro / avanti di 10 secondi	Reculer / avancer de 10 secondes
+Camera names	Nomi delle telecamere	Noms des caméras
+Cameras with black bars send their light stream in 4:3 (e.g. 640×480) while the tiles are 16:9. “Fill” crops the edges, and with them the camera clock; “Stretch” shows everything. The best fix is to set the camera's sub-stream to 16:9 (e.g. 640×360) on the recorder.	Le telecamere con le bande nere inviano il flusso leggero in 4:3 (es. 640×480), mentre i riquadri sono 16:9. «Riempi» taglia i bordi e con loro l'orologio della telecamera; «Allunga» mostra tutto. La soluzione migliore è impostare il flusso secondario della telecamera in 16:9 (es. 640×360) sul registratore.	Les caméras avec des bandes noires envoient leur flux léger en 4:3 (ex. 640×480) alors que les cases sont en 16:9. « Remplir » coupe les bords, et avec eux l'horloge de la caméra ; « Étirer » montre tout. La meilleure solution est de régler le flux secondaire de la caméra en 16:9 (ex. 640×360) sur l'enregistreur.
+Cancel the selection	Annulla la selezione	Annuler la sélection
+Cannot export the settings	Impossibile esportare le impostazioni	Impossible d'exporter les réglages
+Center on the playhead (C)	Centra sul punto di riproduzione (C)	Centrer sur la tête de lecture (C)
+Center the timeline on the playhead	Centra la timeline sul punto di riproduzione	Centrer la chronologie sur la tête de lecture
+Devices, cameras, layout and preferences will be replaced by those in the file (%@ devices). For devices without a saved password Vedetta will ask you to sign in.	Dispositivi, telecamere, disposizione e preferenze saranno sostituiti da quelli del file (%@ dispositivi). Per i dispositivi senza password salvata Vedetta ti chiederà di accedere.	Les appareils, caméras, dispositions et préférences seront remplacés par ceux du fichier (%@ appareils). Pour les appareils sans mot de passe enregistré, Vedetta vous demandera de vous connecter.
+End here	Fine qui	Fin ici
+Export Settings…	Esporta impostazioni…	Exporter les réglages…
+Export…	Esporta…	Exporter…
+Fill (crop the edges)	Riempi (taglia i bordi)	Remplir (coupe les bords)
+Import	Importa	Importer
+Import Settings…	Importa impostazioni…	Importer les réglages…
+Import…	Importa…	Importer…
+Include the audio	Includi l'audio	Inclure le son
+Include the audio when saving recordings	Includi l'audio quando salvi le registrazioni	Inclure le son lors de l'enregistrement des vidéos
+Keyboard shortcuts	Scorciatoie da tastiera	Raccourcis clavier
+Mouse wheel on the timeline	Rotella del mouse sulla timeline	Molette de la souris sur la chronologie
+Mouse wheel: scroll · ⌘ + wheel: zoom	Rotella: scorre · ⌘ + rotella: zoom	Molette : défiler · ⌘ + molette : zoom
+Mouse wheel: zoom · Shift + wheel: scroll	Rotella: zoom · Maiusc + rotella: scorre	Molette : zoom · Maj + molette : défiler
+Move the timeline back	Sposta la timeline indietro	Déplacer la chronologie en arrière
+Move the timeline forward	Sposta la timeline avanti	Déplacer la chronologie en avant
+Never	Mai	Jamais
+Only if the camera records sound. Without audio the file is smaller.	Solo se la telecamera registra il suono. Senza audio il file è più leggero.	Seulement si la caméra enregistre le son. Sans son, le fichier est plus léger.
+Passwords are not included.	Le password non sono incluse.	Les mots de passe ne sont pas inclus.
+Picture in the tiles	Immagine nei riquadri	Image dans les cases
+Play / Pause	Riproduci / Pausa	Lecture / Pause
+Previous / next event	Evento precedente / successivo	Événement précédent / suivant
+Record on this Mac (full quality)	Registra su questo Mac (qualità massima)	Enregistrer sur ce Mac (qualité maximale)
+Replace the current settings?	Sostituire le impostazioni attuali?	Remplacer les réglages actuels ?
+Scroll (⌘ + wheel zooms)	Scorrimento (⌘ + rotella per lo zoom)	Défilement (⌘ + molette pour le zoom)
+Selection ends at the current time (O)	La selezione finisce all'istante attuale (O)	La sélection se termine à l'instant actuel (O)
+Selection start / end at the current time	Inizio / fine della selezione all'istante attuale	Début / fin de la sélection à l'instant actuel
+Selection starts at the current time (I)	La selezione inizia all'istante attuale (I)	La sélection commence à l'instant actuel (I)
+Settings are saved automatically as you change them. The export file contains devices, cameras, layout and preferences, but no passwords: they stay in the Keychain.	Le impostazioni si salvano da sole mentre le cambi. Il file esportato contiene dispositivi, telecamere, disposizione e preferenze, ma nessuna password: restano nel Portachiavi.	Les réglages sont enregistrés automatiquement dès que vous les modifiez. Le fichier exporté contient les appareils, les caméras, la disposition et les préférences, mais aucun mot de passe : ils restent dans le trousseau.
+Settings exported	Impostazioni esportate	Réglages exportés
+Settings imported	Impostazioni importate	Réglages importés
+Snapshots and recordings on this Mac always use the camera's full-quality stream, even when the tile shows the light one.	Istantanee e registrazioni su questo Mac usano sempre il flusso a qualità massima della telecamera, anche quando il riquadro mostra quello leggero.	Les captures et les enregistrements sur ce Mac utilisent toujours le flux en qualité maximale de la caméra, même quand la case affiche le flux léger.
+Space or K	Spazio o K	Espace ou K
+Start here	Inizio qui	Début ici
+Stretch (no cropping)	Allunga (senza tagli)	Étirer (sans recadrage)
+This is not a Vedetta settings file	Questo non è un file di impostazioni di Vedetta	Ce n'est pas un fichier de réglages Vedetta
+When the pointer is over the tile	Quando il puntatore è sul riquadro	Quand le pointeur est sur la case
+Whole day	Tutto il giorno	Toute la journée
+Whole picture (black bars)	Immagine intera (bande nere)	Image entière (bandes noires)
+With the mouse only: the wheel over the timeline zooms around the pointer (Shift + wheel scrolls), a click jumps to that time, and the buttons under the timeline zoom, scroll and set the selection.	Solo con il mouse: la rotella sulla timeline fa lo zoom attorno al puntatore (Maiusc + rotella scorre), un clic salta a quell'istante e i pulsanti sotto la timeline fanno zoom, scorrono e impostano la selezione.	À la souris seule : la molette sur la chronologie zoome autour du pointeur (Maj + molette fait défiler), un clic saute à cet instant et les boutons sous la chronologie zooment, font défiler et définissent la sélection.
+Zoom (Shift + wheel scrolls)	Zoom (Maiusc + rotella per scorrere)	Zoom (Maj + molette pour défiler)
+Zoom in the timeline (+)	Ingrandisci la timeline (+)	Agrandir la chronologie (+)
+Zoom out the timeline (–)	Riduci la timeline (–)	Réduire la chronologie (–)
+Zoom the timeline in / out	Ingrandisci / riduci la timeline	Agrandir / réduire la chronologie
+settings	impostazioni	réglages

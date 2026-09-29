@@ -53,7 +53,7 @@ import ONVIFKit
         let json = """
         [{"id":"11111111-2222-3333-4444-555555555555","kind":"vigiNVR","name":"NVR","host":"192.168.1.100","httpPort":443,"rtspPort":554,
           "username":"admin","addedAt":"2026-09-28T22:50:54Z","channels":[{"id":"11111111-2222-3333-4444-555555555555-1",
-          "deviceID":"11111111-2222-3333-4444-555555555555","number":1,"name":"Ingresso","isOnline":true,"isHidden":false,"supportsPlayback":true}]}]
+          "deviceID":"11111111-2222-3333-4444-555555555555","number":1,"name":"Entrance","isOnline":true,"isHidden":false,"supportsPlayback":true}]}]
         """
         let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
         let devices = try d.decode([Device].self, from: Data(json.utf8))

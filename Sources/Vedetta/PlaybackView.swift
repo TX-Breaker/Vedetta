@@ -455,8 +455,9 @@ struct PlaybackView: View {
 
     /// Single keys, no chords (usable with one hand); ignored while typing or in another window/sheet.
     func handleKey(_ event: NSEvent) -> Bool {
+        // Key events go to the key window: only those addressed to the window showing Recordings count.
         guard model.section == .playback, !selectedIDs.isEmpty, let w = event.window, w === hostWindow.window,
-              w.isKeyWindow, w.attachedSheet == nil, !(w.firstResponder is NSText) else { return false }
+              w.attachedSheet == nil, !(w.firstResponder is NSText) else { return false }
         let mods = event.modifierFlags.intersection([.command, .control])
         guard mods.isEmpty else { return false }
         let shift = event.modifierFlags.contains(.shift)

@@ -20,6 +20,7 @@ final class SelfTest {
     /// What the test is doing (reported with UI freezes).
     private var phase = "start"
     private var maxLagPhase = ""
+    private var keyWindowLost = 0
     private let out: URL
     private let work: URL
     private let started = Date()
@@ -231,6 +232,7 @@ final class SelfTest {
     }
 
     private func key(_ chars: String, code: UInt16, shift: Bool = false, in w: NSWindow) {
+        if !w.isKeyWindow { keyWindowLost += 1; w.makeKeyAndOrderFront(nil) }
         for type in [NSEvent.EventType.keyDown, .keyUp] {
             post(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: shift ? [.shift] : [],
                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber, context: nil,
@@ -269,19 +271,27 @@ final class SelfTest {
            let a = frames.min(by: { ($0.minX - $0.maxY) < ($1.minX - $1.maxY) }),
            let b = frames.max(by: { ($0.minX - $0.maxY) < ($1.minX - $1.maxY) }) {
             let p0 = NSPoint(x: a.midX, y: a.midY), p3 = NSPoint(x: b.midX, y: b.midY)
-            var sawDrag = false
-            mouse(.leftMouseDown, p0, in: w)
-            await sleep(0.1)
-            for i in 1...15 {
-                let f = CGFloat(i) / 15
-                mouse(.leftMouseDragged, NSPoint(x: p0.x + (p3.x - p0.x) * f, y: p0.y + (p3.y - p0.y) * f), in: w)
-                await sleep(0.05)
-                if model.tileDrag != nil { sawDrag = true }
+            var sawDrag = false, moved = false, attempts = 0, userMouse = false
+            // Synthetic events: the real mouse, if someone is using the Mac, can interrupt a drag — retry then.
+            while attempts < 3, !moved {
+                attempts += 1
+                w.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                await sleep(0.3)
+                mouse(.leftMouseDown, p0, in: w)
+                await sleep(0.1)
+                for i in 1...15 {
+                    let f = CGFloat(i) / 15
+                    mouse(.leftMouseDragged, NSPoint(x: p0.x + (p3.x - p0.x) * f, y: p0.y + (p3.y - p0.y) * f), in: w)
+                    await sleep(0.05)
+                    if model.tileDrag != nil { sawDrag = true }
+                }
+                mouse(.leftMouseUp, p3, in: w)
+                moved = await waitUntil(3) { self.model.channelID(atTile: 0) != t0 && self.model.layout.slots.contains(t0) }
+                if CGEventSource.secondsSinceLastEventType(.hidSystemState, eventType: .mouseMoved) < 3 { userMouse = true }
             }
-            mouse(.leftMouseUp, p3, in: w)
-            let moved = await waitUntil(3) { self.model.channelID(atTile: 0) != t0 && self.model.layout.slots.contains(t0) }
             let target = model.layout.slots.firstIndex(of: t0).map(String.init) ?? "-"
-            check("live-tile-drag", moved, "gesture \(sawDrag ? "seen" : "not seen"), camera now in tile \(target)")
+            check("live-tile-drag", moved, "gesture \(sawDrag ? "seen" : "not seen"), camera now in tile \(target), attempts \(attempts)\(userMouse ? ", real mouse in use" : "")")
             if moved { model.assign(channelID: t0, toTile: 0) }
         }
 
@@ -351,14 +361,20 @@ final class SelfTest {
         let paused = await waitUntil(3) { !s.isPlaying }
         key(" ", code: 49, in: w)
         let playing = await waitUntil(3) { s.isPlaying }
+        await waitUntil(5) { !s.isBuffering }
         let before = s.currentTime
-        key("", code: 124, in: w)                     // →: +10 s
-        let jumped = await waitUntil(8) { s.currentTime.timeIntervalSince(before) >= 8 }
+        let arrow = String(UnicodeScalar(UInt16(NSRightArrowFunctionKey))!)
+        key(arrow, code: 124, in: w)                  // →: +10 s
+        let jumped = await waitUntil(10) { s.currentTime.timeIntervalSince(before) >= 8 }
+        let delta = s.currentTime.timeIntervalSince(before)
+        await waitUntil(10) { !s.isBuffering }
+        await sleep(1)
         let t = Date().addingTimeInterval(-1)
         key("s", code: 1, in: w)
         let shot = await waitUntilValue(8) { self.newestFile(in: self.model.settings.snapshotsURL, ext: "jpg", after: t) }
         check("playback-keys", paused && playing && jumped && shot != nil,
-              "space pause \(paused), space play \(playing), → +10 s \(jumped), S snapshot \(shot != nil)")
+              String(format: "space pause %@, space play %@, → %+.1f s, S snapshot %@, buffering %@, notice %@, window not key %d×, app active %@",
+                     "\(paused)", "\(playing)", delta, "\(shot != nil)", "\(s.isBuffering)", s.notice ?? "-", keyWindowLost, "\(NSApp.isActive)"))
         model.section = .live
         await sleep(2)
     }
@@ -498,10 +514,10 @@ final class SelfTest {
         do {
             switch dev.kind {
             case .vigiNVR:
-                _ = try await DeviceConnector.connectNVR(address: dev.host, httpPort: dev.httpPort, rtspPort: dev.rtspPort, username: dev.username, password: "sbagliata")
+                _ = try await DeviceConnector.connectNVR(address: dev.host, httpPort: dev.httpPort, rtspPort: dev.rtspPort, username: dev.username, password: "wrong-password")
             default:
                 _ = try await DeviceConnector.connectRecorder(address: dev.onvifURL.flatMap { URL(string: $0) }.map { "\($0.host!):\($0.port ?? 80)" } ?? dev.host,
-                                                              onvifURL: dev.onvifURL, brand: nil, rtspPort: dev.rtspPort, username: dev.username, password: "sbagliata")
+                                                              onvifURL: dev.onvifURL, brand: nil, rtspPort: dev.rtspPort, username: dev.username, password: "wrong-password")
             }
             wrong = ""
         } catch {
@@ -536,7 +552,7 @@ final class SelfTest {
         let r = await good.connect()
         check("form-connect", r != nil && r?.device.channels.count == dev.channels.count, good.error ?? "\(r?.device.channels.count ?? 0) channels")
         await r?.discardSession()
-        let bad = form(password: "sbagliata")
+        let bad = form(password: "wrong-password")
         let rb = await bad.connect()
         check("form-wrong-password", rb == nil && (bad.error ?? "").lowercased().contains(L("Password").lowercased()), bad.error ?? "")
         let empty = form(password: "")

@@ -41,13 +41,13 @@ import Foundation
     @Test func aDamagedChannelDoesNotLoseTheDevice() throws {
         let id = UUID()
         let d = try decode(Device.self, """
-        {"id":"\(id)","kind":"vigiNVR","name":"NVR","host":"192.168.1.40","httpPort":443,"rtspPort":554,"username":"viewer",
+        {"id":"\(id)","kind":"vigiNVR","name":"NVR","host":"192.168.1.100","httpPort":443,"rtspPort":554,"username":"viewer",
          "addedAt":"2026-09-29T10:00:00Z","channels":[
-           {"id":"\(id)-1","deviceID":"\(id)","number":1,"name":"Ingresso","isOnline":true,"isHidden":false,"supportsPlayback":true},
+           {"id":"\(id)-1","deviceID":"\(id)","number":1,"name":"Entrance","isOnline":true,"isHidden":false,"supportsPlayback":true},
            {"id":"broken"},
            {"deviceID":"\(id)","number":3,"name":"Garage"}]}
         """)
-        #expect(d.channels.map(\.name) == ["Ingresso", "Garage"])
+        #expect(d.channels.map(\.name) == ["Entrance", "Garage"])
         #expect(d.channels[1].isOnline && !d.channels[1].isHidden)   // missing fields get their defaults
     }
 
@@ -72,7 +72,7 @@ import Foundation
 
     @Test func backupContainsEverythingButPasswords() throws {
         var d = Device(kind: .vigiNVR, name: "NVR", host: "10.0.0.2", httpPort: 443, rtspPort: 554, username: "viewer")
-        d.channels = [Channel(deviceID: d.id, number: 1, name: "Ingresso")]
+        d.channels = [Channel(deviceID: d.id, number: 1, name: "Entrance")]
         var layout = LiveLayout(); layout.slots = [d.channels[0].id]
         let b = SettingsBackup(appVersion: "1.0.0", settings: .defaults, layout: layout, devices: [d], language: "it")
         let data = try b.encoded()

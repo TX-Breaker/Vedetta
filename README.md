@@ -19,10 +19,6 @@
   <a href="https://github.com/TX-Breaker/vedetta/actions"><img src="https://github.com/TX-Breaker/vedetta/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
-<p align="center">
-  <a href="README.it.md">Italiano</a> · <a href="README.fr.md">Français</a>
-</p>
-
 ---
 
 Vedetta replaces heavyweight Windows video-management software (often run on the Mac through
@@ -59,7 +55,7 @@ and a tiny CPU footprint — **16 cameras live at ~10–13 % CPU** on an Apple S
   and the backup used), File › Export/Import Settings (everything except passwords).
 - **Private** — passwords stay in the macOS Keychain; Vedetta only talks to devices on your network.
   No accounts, no cloud, no telemetry.
-- **Multilingual** — English, Italiano, Français. Vedetta follows the language of macOS and can be
+- **Multilingual** — English, Italian and French. Vedetta follows the language of macOS and can be
   switched in Settings.
 
 ## Supported devices
@@ -95,11 +91,13 @@ Video: H.264 and H.265/HEVC. Audio: G.711 (µ-law/A-law), AAC, PCM.
 ```bash
 git clone https://github.com/TX-Breaker/vedetta.git
 cd vedetta
+scripts/bootstrap.sh               # checks the requirements (changes nothing)
 scripts/build-app.sh --install     # builds dist/Vedetta.app, installs it in /Applications and pins it to the Dock
 ```
 
 Requires the macOS 26 SDK (Xcode 26+ or the Command Line Tools with the 26.x SDK) and Swift 6.2+.
 Package a release with `scripts/package.sh` (zip + DMG + SHA-256; optional notarization).
+Copy the project to another computer with `scripts/export-source.sh` — see [docs/moving-to-another-computer.md](docs/moving-to-another-computer.md).
 
 ## Tests
 
@@ -117,7 +115,7 @@ your Mac — no real camera required.
 ## Translations
 
 All texts live in one table, [`Resources/Localization/strings.tsv`](Resources/Localization/strings.tsv)
-(English key · Italiano · Français). Run `python3 scripts/l10n.py` to regenerate the macOS `.strings`
+(English key · Italian · French). Run `python3 scripts/l10n.py` to regenerate the macOS `.strings`
 files and check that nothing is missing. New languages are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Architecture
@@ -157,6 +155,10 @@ cause that:
 **Use a dedicated user.** Create a user on the recorder with view-only permissions (live view and
 playback) just for Vedetta, instead of `admin`: the admin account and the recorder's own apps stay
 unaffected whatever happens.
+
+## Documentation
+
+Everything is in [docs/](docs/README.md): [user guide](docs/user-guide.md), [keyboard shortcuts](docs/keyboard-shortcuts.md), [troubleshooting](docs/troubleshooting.md), [account protection](docs/account-protection.md), [settings and data](docs/settings-and-data.md), [developer guide](docs/developer-guide.md), [moving to another computer](docs/moving-to-another-computer.md).
 
 ## Privacy & security
 

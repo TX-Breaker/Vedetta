@@ -52,7 +52,10 @@ final class AppModel {
     var layout = LiveLayout() { didSet { layoutStore.save(layout) } }
 
     // UI state
-    var section: AppSection = .live { didSet { UserDefaults.standard.set(section.rawValue, forKey: "LastSection") } }
+    /// The last section is remembered — not by test/dev runs, which share the app's preferences domain.
+    var section: AppSection = .live {
+        didSet { if !AppPaths.isIsolated { UserDefaults.standard.set(section.rawValue, forKey: "LastSection") } }
+    }
     var selectedTile: Int? = nil
     var singleTileRestore: GridKind? = nil
     var tourRunning = false
@@ -98,7 +101,8 @@ final class AppModel {
         devices = devicesStore.load() ?? []
         settings = settingsStore.load() ?? .defaults
         layout = layoutStore.load() ?? LiveLayout()
-        if let last = UserDefaults.standard.string(forKey: "LastSection"), let sec = AppSection(rawValue: last), sec != .devices { section = sec }
+        if !AppPaths.isIsolated, let last = UserDefaults.standard.string(forKey: "LastSection"),
+           let sec = AppSection(rawValue: last), sec != .devices { section = sec }
         isLocked = settings.lockWithTouchID
         exports.deviceLookup = { [weak self] id in self?.devices.first { $0.id == id } }
         exports.onCompleted = { [weak self] rec in
@@ -558,7 +562,7 @@ final class AppModel {
     // MARK: System integration (save CPU when nothing is visible)
 
     /// Automatic pause of streams when no window is visible (disabled by the self-test).
-    @ObservationIgnored var autoSuspendEnabled = true
+    @ObservationIgnored var autoSuspendEnabled = !(isDevMode && ProcessInfo.processInfo.environment["VEDETTA_KEEP_STREAMS"] == "1")
 
     func windowVisibilityChanged(_ window: NSWindow, visible: Bool) {
         guard autoSuspendEnabled else { return }

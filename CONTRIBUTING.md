@@ -2,6 +2,8 @@
 
 Thanks for helping! Bug reports, device compatibility reports, translations and pull requests are welcome.
 
+Full documentation: [docs/](docs/README.md) — start with [docs/developer-guide.md](docs/developer-guide.md).
+
 ## Development setup
 
 - macOS 26+, Apple Silicon, Xcode 26+ (or Command Line Tools with the macOS 26.x SDK), Swift 6.2+.
@@ -11,7 +13,7 @@ Thanks for helping! Bug reports, device compatibility reports, translations and 
 swift build                       # build all modules
 swift test                        # unit tests
 scripts/build-app.sh --install    # build and install dist/Vedetta.app
-scripts/regression.sh             # full regression suite (~12 minutes, no real camera needed)
+scripts/regression.sh             # full regression suite (~35 minutes, no real camera needed)
 ```
 
 The regression suite starts a local RTSP server (mediamtx + ffmpeg test streams), a mock VIGI NVR and a mock
@@ -28,7 +30,7 @@ playback or exports.
 ## Translations
 
 All texts are in [`Resources/Localization/strings.tsv`](Resources/Localization/strings.tsv):
-`English key <TAB> Italiano <TAB> Français`.
+`English key <TAB> Italian <TAB> French`.
 
 1. Add or edit rows (placeholders are `%@`; reorder them in a translation with `%1$@`, `%2$@`).
 2. Run `python3 scripts/l10n.py` — it regenerates the `.lproj` files and fails if a key used in the code

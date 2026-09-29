@@ -15,7 +15,7 @@ func usage() -> Never {
     print("usage: vedetta-probe rtsp|discover|onvif|vigi|nvr|recorder|brand|ptz <target> … (credentials in VEDETTA_USER / VEDETTA_PASS)")
     exit(2)
 }
-guard args.count >= 3 else { usage() }
+guard args.count >= 3 || (args.count == 2 && args[1] == "discover") else { usage() }
 let env = ProcessInfo.processInfo.environment
 
 func value(after flag: String) -> String? {
@@ -129,7 +129,7 @@ case "ptz":
             try await c.stop(profile: profile)
             try await c.continuousMove(profile: profile, pan: 0, tilt: 0, zoom: 0.3)
             try await c.stop(profile: profile)
-            let tok = try await c.setPreset(profile: profile, name: "Cancello")
+            let tok = try await c.setPreset(profile: profile, name: "Gate")
             let presets = try await c.presets(profile: profile)
             try await c.gotoPreset(profile: profile, preset: tok ?? "")
             try await c.removePreset(profile: profile, preset: tok ?? "")

@@ -9,12 +9,8 @@ BUILD=${VEDETTA_BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}
 # Signing: ad-hoc by default; set VEDETTA_SIGN_IDENTITY="Developer ID Application: …" for distribution builds.
 SIGN_IDENTITY=${VEDETTA_SIGN_IDENTITY:--}
 
-# Use full Xcode when available, otherwise the Command Line Tools with the macOS 26.5 SDK.
-if xcodebuild -version >/dev/null 2>&1; then
-  export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-else
-  export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
-fi
+# SDK: full Xcode when available, otherwise the newest macOS 26 SDK of the Command Line Tools.
+source $ROOT/scripts/sdk.sh
 
 swift build -c release --product Vedetta
 

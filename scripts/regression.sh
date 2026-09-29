@@ -6,6 +6,7 @@
 #        scripts/regression.sh selftest     only the in-app self tests
 #        scripts/regression.sh resilience   only the account-protection scenario (~8 minutes)
 #        scripts/regression.sh vigi         only the VIGI in-app self test (~5 minutes)
+#        scripts/regression.sh perf         only the 16-camera performance and idle checks (~2 minutes)
 # Report: scripts/testenv/regression-report.txt
 setopt NO_NOMATCH
 ROOT=${0:A:h:h}
@@ -16,8 +17,7 @@ REPORT=$ENV/regression-report.txt
 : > $REPORT
 NPASS=0; NFAIL=0
 QUICK=${1:-}
-if xcodebuild -version >/dev/null 2>&1; then export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-else export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk; fi
+source $ROOT/scripts/sdk.sh
 
 log() { print -r -- "$*" | tee -a $REPORT; }
 ok() { NPASS=$((NPASS+1)); log "  ✔ $1"; }
@@ -85,7 +85,7 @@ if [[ -z $QUICK ]]; then
   expect "VIGI API login + channels" "$O" "channel 3: Garage"
   expect "VIGI API calendar/segments/events" "$O" "events 24h: [1-9]"
   expect "VIGI API wrong password" "$(VEDETTA_PASS=wrong $P vigi 127.0.0.1:8443 2>&1)" "Wrong user name or password"
-  expect "VIGI NVR full connection" "$($P nvr 127.0.0.1:8443 8554 2>&1)" "name=NVR di prova .*channels=\[\"Ingresso\", \"Giardino\", \"Garage\"\] warnings=\[\]"
+  expect "VIGI NVR full connection" "$($P nvr 127.0.0.1:8443 8554 2>&1)" "name=Test NVR .*channels=\[\"Entrance\", \"Garden\", \"Garage\"\] warnings=\[\]"
   O=$($P recorder 127.0.0.1:8081 2>&1)
   expect "ONVIF NVR: channels and recordings" "$O" "channel 2 Channel 2 src=VideoSource_2 rec=Rec_2"
   expect "ONVIF NVR: Profile G timeline" "$O" "today: 2 segments"
@@ -102,7 +102,7 @@ if [[ -z $QUICK ]]; then
   expect "WS-Discovery" "$($P discover x 2>&1)" "found: [0-9]+"
   nohup python3 scripts/mock_onvif.py 8082 $ENV/credentials > $ENV/mock_ptz.log 2>&1 &
   sleep 2
-  expect "ONVIF PTZ (move, zoom, presets)" "$($P ptz http://127.0.0.1:8082/onvif/device_service 2>&1)" "ptz ok: .*presets=\[\"Cancello\"\] after=0"
+  expect "ONVIF PTZ (move, zoom, presets)" "$($P ptz http://127.0.0.1:8082/onvif/device_service 2>&1)" "ptz ok: .*presets=\[\"Gate\"\] after=0"
   pkill -f "mock_onvif.py 8082"
 fi
 
@@ -147,7 +147,7 @@ PY
   done
   log "  · CPU $name: average $(( samples ? sum / samples : 0 ))%, peak ${maxcpu}%"
 }
-if [[ $QUICK != resilience ]]; then
+if [[ $QUICK != resilience && $QUICK != perf ]]; then
   log "[6] In-app self test — VIGI recorder (Italian, English)"
   run_selftest vigi-it $ENV/devconfig.json it
   [[ $QUICK == vigi ]] && { log "== Result: $NPASS passed, $NFAIL failed"; pkill -f mock_nvr.py; pkill -f mock_onvif.py; scripts/test-rtsp-server.sh stop >/dev/null 2>&1; exit $(( NFAIL > 0 )); }
@@ -155,18 +155,21 @@ if [[ $QUICK != resilience ]]; then
   log "[7] In-app self test — ONVIF recorder of another brand (French)"
   run_selftest onvif-fr $ENV/devconfig-onvif.json fr
 fi
-log "[7b] Account protection — recorder offline 2 min, refused password, locked user, sign out, switch user"
-run_selftest resilience-it $ENV/devconfig.json it resilience 1100
+if [[ $QUICK != perf ]]; then
+  log "[7b] Account protection — recorder offline 2 min, refused password, locked user, sign out, switch user"
+  run_selftest resilience-it $ENV/devconfig.json it resilience 1100
+fi
 scripts/test-rtsp-server.sh start >/dev/null 2>&1   # in case the scenario stopped it
 
-if [[ -z $QUICK ]]; then
+if [[ -z $QUICK || $QUICK == perf ]]; then
   # 8. Performance: 16 channels ------------------------------------------------------------------
   log "[8] Performance with 16 cameras"
   pkill -f mock_onvif.py; sleep 1
   MOCK_CHANNELS=16 nohup python3 scripts/mock_onvif.py 8081 $ENV/credentials > $ENV/mock_onvif.log 2>&1 &
   sleep 2
   cleanup_app_state
-  VEDETTA_DEV=1 VEDETTA_DEV_CONFIG=$ROOT/$ENV/devconfig-onvif.json $APPBIN > $ENV/app-perf.log 2>&1 &
+  # Streams stay on even if other windows cover the test window (this measures load, not the pause).
+  VEDETTA_DEV=1 VEDETTA_KEEP_STREAMS=1 VEDETTA_DEV_CONFIG=$ROOT/$ENV/devconfig-onvif.json $APPBIN > $ENV/app-perf.log 2>&1 &
   PID=$!
   sleep 25
   SUM=0; N=0; MAX=0

@@ -153,11 +153,11 @@ class H(BaseHTTPRequestHandler):
     def ds(self, req):
         if "device_info" in req:
             return self.reply({"error_code": 0, "device_info": {"info": {".name": "info", "device_model": "VIGI NVR2016H(UN)",
-                              "device_name": "NVR%20di%20prova", "sw_version": "1.2.0 Build 240101"}}})
+                              "device_name": "Test%20NVR", "sw_version": "1.2.0 Build 240101"}}})
         if "chm" in req and "table" in req["chm"]:
             chans = [
-                {"added_dev_1": {"id": "1", "name": "VIGI C340", "alias": "Ingresso", "ip": "10.0.0.11", "online": "1", "auth_result": "0", "connect_prot": "TP-LINK"}},
-                {"added_dev_2": {"id": "2", "name": "VIGI C340", "alias": "Giardino", "ip": "10.0.0.12", "online": "1", "auth_result": "0", "connect_prot": "TP-LINK"}},
+                {"added_dev_1": {"id": "1", "name": "VIGI C340", "alias": "Entrance", "ip": "10.0.0.11", "online": "1", "auth_result": "0", "connect_prot": "TP-LINK"}},
+                {"added_dev_2": {"id": "2", "name": "VIGI C340", "alias": "Garden", "ip": "10.0.0.12", "online": "1", "auth_result": "0", "connect_prot": "TP-LINK"}},
                 {"added_dev_3": {"id": "3", "name": "VIGI C340-W", "alias": "Garage", "ip": "10.0.0.14", "online": "0", "auth_result": "0", "connect_prot": "TP-LINK"}},
             ]
             return self.reply({"error_code": 0, "chm": {"added_dev": chans}})

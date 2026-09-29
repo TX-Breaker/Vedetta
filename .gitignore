@@ -16,3 +16,11 @@ private/
 
 .DS_Store
 *.log
+
+# Local only — never published (see GITHUB_PUBLISHING.txt)
+GITHUB_PUBLISHING.txt
+.claude/
+*PROMPT*.md
+Vedetta settings*.json
+Vedetta impostazioni*.json
+Vedetta réglages*.json

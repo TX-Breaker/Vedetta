@@ -39,6 +39,11 @@ First public release.
   protection scenarios (recorder offline for 2 minutes, refused password, locked user, sign out while offline,
   switch user with live streams).
 
+- Documentation in `docs/`: user guide, keyboard shortcuts, troubleshooting, account protection,
+  settings and data, developer guide, architecture, moving the project to another computer.
+- `scripts/bootstrap.sh` (requirements check), `scripts/export-source.sh` (git bundle + source zip to copy the
+  project), `scripts/sdk.sh` (automatic SDK choice, no machine-specific paths).
+
 ### Fixed (before release)
 - RTSP TEARDOWN was never sent when a stream closed, leaving sessions open on the recorder.
 - A refused RTSP password was sent twice on the same connection.

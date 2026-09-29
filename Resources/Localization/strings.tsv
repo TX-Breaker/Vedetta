@@ -1,0 +1,399 @@
+# Vedetta translations. Columns: English key <TAB> Italiano <TAB> Français
+# Placeholders: %@ (use %1$@ %2$@ … in a translation to reorder). Regenerate with: python3 scripts/l10n.py
+# --- Navigation
+Live	Dal vivo	En direct
+Recordings	Registrazioni	Enregistrements
+Events	Eventi	Événements
+Exports	Esportazioni	Exportations
+Album	Album	Album
+Devices	Dispositivi	Appareils
+Cameras	Telecamere	Caméras
+Camera	Telecamera	Caméra
+Recorder	Registratore	Enregistreur
+# --- Common actions
+Cancel	Annulla	Annuler
+Save	Salva	Enregistrer
+Remove	Rimuovi	Supprimer
+Retry	Riprova	Réessayer
+Refresh	Aggiorna	Actualiser
+Open	Apri	Ouvrir
+Show	Mostra	Afficher
+Show in Finder	Mostra nel Finder	Afficher dans le Finder
+Done	Fine	Terminé
+Name	Nome	Nom
+Type	Tipo	Type
+Delete	Elimina	Supprimer
+Share…	Condividi…	Partager…
+Move to Trash	Sposta nel Cestino	Placer dans la corbeille
+Rename…	Rinomina…	Renommer…
+Hide	Nascondi	Masquer
+Visible	Visibile	Visible
+Warning	Attenzione	Attention
+Loading…	Caricamento…	Chargement…
+Previous day	Giorno precedente	Jour précédent
+Next day	Giorno successivo	Jour suivant
+Previous page	Pagina precedente	Page précédente
+Next page	Pagina successiva	Page suivante
+Snapshot	Istantanea	Capture
+Open in a new window	Apri in una nuova finestra	Ouvrir dans une nouvelle fenêtre
+Open folder	Apri cartella	Ouvrir le dossier
+Show live	Mostra dal vivo	Voir en direct
+Review recordings	Rivedi registrazioni	Revoir les enregistrements
+Review	Rivedi	Revoir
+Play	Riproduci	Lire
+# --- Sidebar / main window
+%@ of %@ cameras online	%@ di %@ telecamere online	%@ caméras en ligne sur %@
+Add device	Aggiungi dispositivo	Ajouter un appareil
+Add device…	Aggiungi dispositivo…	Ajouter un appareil…
+Rename camera	Rinomina telecamera	Renommer la caméra
+Drag onto a tile, or double-click to watch it	Trascina su un riquadro, oppure doppio clic per vederla	Faites-la glisser sur une case ou double-cliquez pour la voir
+View	Vista	Présentation
+Layout	Disposizione	Disposition
+Stop automatic tour	Interrompi giro automatico	Arrêter la rotation automatique
+Start automatic tour	Avvia giro automatico	Démarrer la rotation automatique
+# --- Welcome / connect
+Welcome to Vedetta	Benvenuto in Vedetta	Bienvenue dans Vedetta
+Watch your cameras live, review recordings and save them on your Mac.\nWorks with VIGI, Hikvision, Dahua, Reolink and Uniview recorders and with any ONVIF device.	Guarda le telecamere in diretta, rivedi le registrazioni e salvale sul Mac.\nFunziona con registratori VIGI, Hikvision, Dahua, Reolink, Uniview e con qualsiasi dispositivo ONVIF.	Regardez vos caméras en direct, revoyez les enregistrements et sauvegardez-les sur votre Mac.\nCompatible avec les enregistreurs VIGI, Hikvision, Dahua, Reolink et Uniview et avec tout appareil ONVIF.
+What do you want to connect?	Cosa vuoi collegare?	Que voulez-vous connecter ?
+Passwords stay in your Mac's Keychain. Vedetta only talks to the devices on your network.	Le password restano nel Portachiavi del Mac. Vedetta comunica solo con i dispositivi della tua rete.	Les mots de passe restent dans le trousseau de votre Mac. Vedetta ne communique qu'avec les appareils de votre réseau.
+Looking for devices on the network…	Cerco i dispositivi nella rete…	Recherche des appareils sur le réseau…
+Recorders found on your network	Registratori trovati nella tua rete	Enregistreurs trouvés sur votre réseau
+Cameras found on your network	Telecamere trovate nella tua rete	Caméras trouvées sur votre réseau
+motorized	motorizzata	motorisée
+Connecting…	Connessione in corso…	Connexion en cours…
+Connect	Collega	Connecter
+VIGI NVR	NVR VIGI	NVR VIGI
+Other NVR brands	NVR altre marche	Autres marques de NVR
+ONVIF camera	Telecamera ONVIF	Caméra ONVIF
+RTSP address	Indirizzo RTSP	Adresse RTSP
+TP-Link VIGI recorders: live view, recordings and events.	Registratori TP-Link VIGI: diretta, registrazioni ed eventi.	Enregistreurs TP-Link VIGI : direct, enregistrements et événements.
+Hikvision, Dahua, Reolink, Uniview and any ONVIF NVR.	Hikvision, Dahua, Reolink, Uniview e qualsiasi NVR ONVIF.	Hikvision, Dahua, Reolink, Uniview et tout NVR ONVIF.
+ONVIF cameras of any brand, including PTZ models.	Telecamere di qualsiasi marca compatibili ONVIF, anche motorizzate.	Caméras ONVIF de toutes marques, y compris motorisées (PTZ).
+Any RTSP video stream (rtsp://…).	Qualsiasi flusso video RTSP (rtsp://…).	Tout flux vidéo RTSP (rtsp://…).
+Address	Indirizzo	Adresse
+e.g. 192.168.1.100	es. 192.168.1.100	ex. 192.168.1.100
+optional, e.g. Backyard	facoltativo, es. Cortile	facultatif, ex. Jardin
+e.g. Gate	es. Cancello	ex. Portail
+RTSP URL	URL RTSP	URL RTSP
+User	Utente	Utilisateur
+Password	Password	Mot de passe
+Enter the password again	Inserisci di nuovo la password	Saisissez à nouveau le mot de passe
+Device password	Password del dispositivo	Mot de passe de l'appareil
+Advanced options	Opzioni avanzate	Options avancées
+Brand	Marca	Marque
+Detect automatically (ONVIF)	Rileva automaticamente (ONVIF)	Détection automatique (ONVIF)
+HTTPS port	Porta HTTPS	Port HTTPS
+RTSP port	Porta RTSP	Port RTSP
+ONVIF service	Servizio ONVIF	Service ONVIF
+automatic	automatico	automatique
+Recorders found on the network	Registratori trovati in rete	Enregistreurs trouvés sur le réseau
+Devices found on the network	Dispositivi trovati in rete	Appareils trouvés sur le réseau
+Search again	Cerca di nuovo	Rechercher à nouveau
+No device found automatically. Enter the address manually.	Nessun dispositivo trovato automaticamente. Inserisci l'indirizzo a mano.	Aucun appareil trouvé automatiquement. Saisissez l'adresse manuellement.
+Already added	Già aggiunto	Déjà ajouté
+Add a device	Aggiungi un dispositivo	Ajouter un appareil
+Edit %@	Modifica %@	Modifier %@
+Recorders (VIGI, Hikvision, Dahua, Reolink, Uniview, ONVIF), ONVIF cameras of any brand or RTSP addresses.	Registratori (VIGI, Hikvision, Dahua, Reolink, Uniview, ONVIF), telecamere ONVIF di qualsiasi marca o indirizzi RTSP.	Enregistreurs (VIGI, Hikvision, Dahua, Reolink, Uniview, ONVIF), caméras ONVIF de toutes marques ou adresses RTSP.
+Update the device address and credentials.	Aggiorna indirizzo e credenziali del dispositivo.	Mettez à jour l'adresse et les identifiants de l'appareil.
+%@ connected	%@ collegato	%@ connecté
+%@ cameras ready	%@ telecamere pronte	%@ caméras prêtes
+# --- Devices
+Remove %@?	Rimuovere %@?	Supprimer %@ ?
+The device and its cameras will be removed from Vedetta. Recordings on the recorder are not touched.	Il dispositivo e le sue telecamere verranno tolti da Vedetta. Le registrazioni sul registratore non vengono toccate.	L'appareil et ses caméras seront retirés de Vedetta. Les enregistrements de l'enregistreur ne sont pas modifiés.
+Firmware %@	Firmware %@	Firmware %@
+Refresh the camera list	Aggiorna l'elenco delle telecamere	Actualiser la liste des caméras
+Open the device web interface (all settings)	Apri l'interfaccia web del dispositivo (tutte le impostazioni)	Ouvrir l'interface web de l'appareil (tous les réglages)
+Edit credentials	Modifica credenziali	Modifier les identifiants
+List updated	Elenco aggiornato	Liste actualisée
+%@ cameras	%@ telecamere	%@ caméras
+Update failed	Aggiornamento non riuscito	Échec de l'actualisation
+Show or hide this camera	Mostra o nascondi questa telecamera	Afficher ou masquer cette caméra
+%@ — web interface	%@ — interfaccia web	%@ — interface web
+# --- Device kinds, quality, layouts
+VIGI recorder (TP-Link)	Registratore VIGI (TP-Link)	Enregistreur VIGI (TP-Link)
+ONVIF recorder	Registratore ONVIF	Enregistreur ONVIF
+RTSP recorder	Registratore RTSP	Enregistreur RTSP
+RTSP camera	Telecamera RTSP	Caméra RTSP
+Automatic	Automatica	Automatique
+High	Alta	Haute
+Low	Bassa	Basse
+1 tile	1 riquadro	1 case
+4 tiles	4 riquadri	4 cases
+6 tiles (1+5)	6 riquadri (1+5)	6 cases (1+5)
+8 tiles (1+7)	8 riquadri (1+7)	8 cases (1+7)
+9 tiles	9 riquadri	9 cases
+16 tiles	16 riquadri	16 cases
+Channel %@	Canale %@	Canal %@
+Recorder %@	Registratore %@	Enregistreur %@
+# --- Live
+%@ cameras · page %@ of %@	%@ telecamere · pagina %@ di %@	%@ caméras · page %@ sur %@
+Choose how many tiles to show	Scegli quanti riquadri vedere	Choisissez le nombre de cases à afficher
+Automatic tour	Giro automatico	Rotation automatique
+Stop the automatic page tour	Ferma il giro automatico delle pagine	Arrêter la rotation automatique des pages
+Scroll through pages automatically every %@ seconds	Scorri automaticamente le pagine ogni %@ secondi	Faire défiler les pages automatiquement toutes les %@ secondes
+Video quality	Qualità video	Qualité vidéo
+Fill the tiles	Riempi i riquadri	Remplir les cases
+Show video information	Mostra informazioni video	Afficher les informations vidéo
+Quality	Qualità	Qualité
+Video quality and appearance	Qualità e aspetto del video	Qualité et apparence de la vidéo
+Full screen	Schermo intero	Plein écran
+Add camera	Aggiungi telecamera	Ajouter une caméra
+or drag it here	oppure trascinala qui	ou faites-la glisser ici
+Choose the camera	Scegli la telecamera	Choisissez la caméra
+Audio	Audio	Audio
+Stop recording	Ferma registrazione	Arrêter l'enregistrement
+Record on this Mac	Registra sul Mac	Enregistrer sur ce Mac
+PTZ control	Controllo PTZ	Commande PTZ
+Back to grid	Torna alla griglia	Retour à la grille
+Enlarge	Ingrandisci	Agrandir
+Reset zoom	Annulla zoom	Réinitialiser le zoom
+Connecting to camera…	Connessione…	Connexion…
+Camera offline	Telecamera offline	Caméra hors ligne
+Recording saved	Registrazione salvata	Enregistrement sauvegardé
+Recording not saved	Registrazione non salvata	Enregistrement non sauvegardé
+Cannot record	Impossibile registrare	Impossible d'enregistrer
+Recording started	Registrazione avviata	Enregistrement démarré
+%@ — the file is being saved on this Mac	%@ — il file viene salvato sul Mac	%@ — le fichier est enregistré sur ce Mac
+Review the last hour	Rivedi l'ultima ora	Revoir la dernière heure
+Remove from tile	Rimuovi dal riquadro	Retirer de la case
+Camera not found	Telecamera non trovata	Caméra introuvable
+The camera has been removed.	La telecamera è stata rimossa.	La caméra a été supprimée.
+# --- PTZ
+No saved positions	Nessuna posizione salvata	Aucune position enregistrée
+Positions	Posizioni	Positions
+Position %@	Posizione %@	Position %@
+Save position	Salva posizione	Enregistrer la position
+Drag to move the camera	Trascina per muovere la telecamera	Faites glisser pour déplacer la caméra
+Hold to zoom in	Tieni premuto per ingrandire	Maintenez pour zoomer
+Hold to zoom out	Tieni premuto per ridurre	Maintenez pour dézoomer
+PTZ command failed	Comando PTZ non riuscito	La commande PTZ a échoué
+# --- Playback
+No recorder	Nessun registratore	Aucun enregistreur
+Add a recorder (VIGI, Hikvision, Dahua or any ONVIF NVR with recordings) to review recorded video here.	Aggiungi un registratore (VIGI, Hikvision, Dahua o qualsiasi NVR ONVIF con registrazioni) per rivedere qui i video registrati.	Ajoutez un enregistreur (VIGI, Hikvision, Dahua ou tout NVR ONVIF avec enregistrements) pour revoir ici les vidéos enregistrées.
+Add recorder	Aggiungi registratore	Ajouter un enregistreur
+Cannot read the list of recordings	Impossibile leggere l'elenco delle registrazioni	Impossible de lire la liste des enregistrements
+Up to 4 at once, synchronized	Fino a 4 insieme, sincronizzate	Jusqu'à 4 à la fois, synchronisées
+Events of the day	Eventi del giorno	Événements du jour
+No events detected	Nessun evento rilevato	Aucun événement détecté
+Export this event	Esporta questo evento	Exporter cet événement
+Export added	Esportazione aggiunta	Exportation ajoutée
+Choose a camera	Scegli una telecamera	Choisissez une caméra
+Select one or more cameras on the left to review their recordings.	Seleziona una o più telecamere a sinistra per rivedere le registrazioni.	Sélectionnez une ou plusieurs caméras à gauche pour revoir leurs enregistrements.
+Previous event	Evento precedente	Événement précédent
+Back 10 seconds	Indietro 10 secondi	Reculer de 10 secondes
+Play / Pause (space bar)	Riproduci / Pausa (barra spaziatrice)	Lecture / Pause (barre d'espace)
+Forward 10 seconds	Avanti 10 secondi	Avancer de 10 secondes
+Next event	Evento successivo	Événement suivant
+Next frame	Fotogramma successivo	Image suivante
+Playback speed	Velocità di riproduzione	Vitesse de lecture
+Select a range on the timeline to save	Seleziona un intervallo sulla timeline da salvare	Sélectionnez une plage sur la chronologie à enregistrer
+Save selection	Salva selezione	Enregistrer la sélection
+Save on this Mac	Salva sul Mac	Enregistrer sur ce Mac
+This recorder does not list its recordings: click a time on the timeline to play it.	Questo registratore non fornisce l'elenco delle registrazioni: clicca un orario sulla timeline per riprodurlo.	Cet enregistreur ne fournit pas la liste de ses enregistrements : cliquez sur une heure de la chronologie pour la lire.
+Selection: %@ – %@ · %@	Selezione: %@ – %@ · %@	Sélection : %@ – %@ · %@
+Drag on the timeline to change it	Trascina sulla timeline per modificarla	Faites glisser sur la chronologie pour la modifier
+Reload the list of recordings	Ricarica l'elenco delle registrazioni	Recharger la liste des enregistrements
+No next event	Nessun evento successivo	Aucun événement suivant
+No previous event	Nessun evento precedente	Aucun événement précédent
+No recordings on this day	Nessuna registrazione in questo giorno	Aucun enregistrement ce jour-là
+Today	Oggi	Aujourd'hui
+day list not available	elenco giorni non disponibile	liste des jours indisponible
+with recordings	con registrazioni	avec enregistrements
+No recordings after this time	Nessuna registrazione dopo questo orario	Aucun enregistrement après cette heure
+The recorder does not support speed %@	Il registratore non supporta la velocità %@	L'enregistreur ne prend pas en charge la vitesse %@
+End of available recordings	Fine delle registrazioni disponibili	Fin des enregistrements disponibles
+No recordings in this range	Nessuna registrazione in questo intervallo	Aucun enregistrement dans cet intervalle
+This device does not allow reviewing recordings.	Questo dispositivo non permette di rivedere le registrazioni.	Cet appareil ne permet pas de revoir les enregistrements.
+# --- Events
+Events (motion, people, vehicles…) are read from recorders that keep recordings (VIGI or ONVIF Profile G).	Gli eventi (movimento, persone, veicoli…) vengono letti dai registratori che conservano le registrazioni (VIGI o ONVIF Profile G).	Les événements (mouvement, personnes, véhicules…) sont lus sur les enregistreurs qui conservent les enregistrements (VIGI ou ONVIF Profile G).
+Reading events from the recorder…	Lettura degli eventi dal registratore…	Lecture des événements sur l'enregistreur…
+No events	Nessun evento	Aucun événement
+There are no events for the chosen filters on this day.	Non ci sono eventi per i filtri scelti in questo giorno.	Aucun événement pour les filtres choisis ce jour-là.
+All cameras	Tutte le telecamere	Toutes les caméras
+Save this event on this Mac	Salva questo evento sul Mac	Enregistrer cet événement sur ce Mac
+Detected at %@. Click to review.	Rilevato alle %@. Clicca per rivedere.	Détecté à %@. Cliquez pour revoir.
+%@ more events	Altri %@ eventi	%@ événements supplémentaires
+Open Vedetta › Events to see them all.	Apri Vedetta › Eventi per vederli tutti.	Ouvrez Vedetta › Événements pour tous les voir.
+Motion	Movimento	Mouvement
+People	Persone	Personnes
+Vehicles	Veicoli	Véhicules
+Lines and intrusions	Linee e intrusioni	Lignes et intrusions
+Areas	Aree	Zones
+Other events	Altri eventi	Autres événements
+Line crossing	Attraversamento linea	Franchissement de ligne
+Intrusion	Intrusione	Intrusion
+Motion (person)	Movimento (persona)	Mouvement (personne)
+Line crossing (person)	Attraversamento linea (persona)	Franchissement de ligne (personne)
+Intrusion (person)	Intrusione (persona)	Intrusion (personne)
+Motion (vehicle)	Movimento (veicolo)	Mouvement (véhicule)
+Line crossing (vehicle)	Attraversamento linea (veicolo)	Franchissement de ligne (véhicule)
+Intrusion (vehicle)	Intrusione (veicolo)	Intrusion (véhicule)
+Person	Persona	Personne
+Vehicle	Veicolo	Véhicule
+Area entering	Ingresso in area	Entrée dans la zone
+Area entering (person)	Ingresso in area (persona)	Entrée dans la zone (personne)
+Area entering (vehicle)	Ingresso in area (veicolo)	Entrée dans la zone (véhicule)
+Area exiting	Uscita da area	Sortie de la zone
+Area exiting (person)	Uscita da area (persona)	Sortie de la zone (personne)
+Area exiting (vehicle)	Uscita da area (veicolo)	Sortie de la zone (véhicule)
+Abandoned object	Oggetto abbandonato	Objet abandonné
+Loitering	Stazionamento	Maraudage
+Loitering (person)	Stazionamento (persona)	Maraudage (personne)
+Loitering (vehicle)	Stazionamento (veicolo)	Maraudage (véhicule)
+Scene change	Cambio di scena	Changement de scène
+Abnormal sound	Suono anomalo	Son anormal
+Tampering	Manomissione	Sabotage
+Alarm input	Ingresso allarme	Entrée d'alarme
+Queue (people)	Coda (persone)	File d'attente (personnes)
+Queue	Coda	File d'attente
+Animal	Animale	Animal
+Tracking	Tracciamento	Suivi
+Event %@	Evento %@	Événement %@
+# --- Exports
+Save recordings on this Mac	Salva le registrazioni sul Mac	Enregistrer les enregistrements sur ce Mac
+Videos are copied from the recorder with no quality loss (MP4).	I video vengono copiati dal registratore senza perdita di qualità (MP4).	Les vidéos sont copiées depuis l'enregistreur sans perte de qualité (MP4).
+From	Dalle	De
+To	Alle	À
+Duration	Durata	Durée
+5 min	5 min	5 min
+15 min	15 min	15 min
+1 hour	1 ora	1 heure
+Export started	Esportazione avviata	Exportation démarrée
+Follow the progress in the Exports section.	Segui l'avanzamento nella sezione Esportazioni.	Suivez la progression dans la section Exportations.
+No exports	Nessuna esportazione	Aucune exportation
+In Recordings, select a range and press “Save on this Mac”: the videos will be downloaded here.	Dalla sezione Registrazioni seleziona un intervallo e premi “Salva sul Mac”: i video verranno scaricati qui.	Dans Enregistrements, sélectionnez une plage et appuyez sur « Enregistrer sur ce Mac » : les vidéos seront téléchargées ici.
+Go to recordings	Vai alle registrazioni	Aller aux enregistrements
+Clear list	Pulisci elenco	Effacer la liste
+Queued	In coda	En attente
+Remove from list	Rimuovi dall'elenco	Retirer de la liste
+Export completed	Esportazione completata	Exportation terminée
+Cancelled	Annullata	Annulée
+Device no longer available	Dispositivo non più disponibile	Appareil plus disponible
+Connecting to the recorder…	Collegamento al registratore…	Connexion à l'enregistreur…
+No recordings in the range	Nessuna registrazione nell'intervallo	Aucun enregistrement dans l'intervalle
+Recordings available until %@: the file contains the part that was found.	Registrazioni disponibili fino alle %@: il file contiene la parte trovata.	Enregistrements disponibles jusqu'à %@ : le fichier contient la partie trouvée.
+Finalizing the file…	Finalizzazione del file…	Finalisation du fichier…
+Export failed	Esportazione non riuscita	Échec de l'exportation
+The recorder did not send any data	Il registratore non ha inviato dati	L'enregistreur n'a envoyé aucune donnée
+Exports in progress	Esportazioni in corso	Exportations en cours
+There are %@ unfinished exports. If you quit they will be interrupted and resumed at the next launch.	Ci sono %@ esportazioni non ancora completate. Se esci verranno interrotte e riprese al prossimo avvio.	%@ exportations ne sont pas terminées. Si vous quittez, elles seront interrompues et reprises au prochain lancement.
+Quit anyway	Esci comunque	Quitter quand même
+%@ exports in progress	%@ esportazioni in corso	%@ exportations en cours
+# --- Album
+Everything	Tutto	Tout
+Snapshots	Istantanee	Captures
+Videos	Video	Vidéos
+The album is empty	L'album è vuoto	L'album est vide
+Snapshots and videos you save from the cameras appear here.	Le istantanee e i video che salvi dalle telecamere compaiono qui.	Les captures et vidéos enregistrées depuis les caméras apparaissent ici.
+Snapshots folder	Cartella istantanee	Dossier des captures
+Videos folder	Cartella video	Dossier des vidéos
+# --- Snapshots / toasts
+Snapshot not available	Istantanea non disponibile	Capture indisponible
+Wait until the video is visible.	Attendi che il video sia visibile.	Attendez que la vidéo soit visible.
+Snapshot saved	Istantanea salvata	Capture enregistrée
+Cannot save the snapshot	Impossibile salvare l'istantanea	Impossible d'enregistrer la capture
+Cannot change the login item	Impossibile modificare l'avvio automatico	Impossible de modifier l'ouverture automatique
+# --- Keychain / lock
+Accessing saved passwords…	Accesso alle password salvate…	Accès aux mots de passe enregistrés…
+If macOS asks for permission to use the Keychain, enter your Mac password and choose “Always Allow”.	Se macOS chiede l'autorizzazione per usare il Portachiavi, inserisci la password del Mac e scegli «Consenti sempre».	Si macOS demande l'autorisation d'utiliser le trousseau, saisissez le mot de passe de votre Mac et choisissez « Toujours autoriser ».
+Vedetta is locked	Vedetta è bloccata	Vedetta est verrouillée
+Unlock with Touch ID or your Mac password.	Sblocca con Touch ID o con la password del Mac.	Déverrouillez avec Touch ID ou le mot de passe de votre Mac.
+Unlock	Sblocca	Déverrouiller
+unlock Vedetta	sbloccare Vedetta	déverrouiller Vedetta
+Vedetta – device credentials	Vedetta – credenziali dispositivo	Vedetta – identifiants de l'appareil
+# --- Settings
+General	Generali	Général
+Video	Video	Vidéo
+Folders	Cartelle	Dossiers
+Advanced	Avanzate	Avancé
+Language	Lingua	Langue
+Automatic (system language)	Automatica (lingua del sistema)	Automatique (langue du système)
+Vedetta follows the language of macOS. Choose a language to override it.	Vedetta segue la lingua di macOS. Scegli una lingua per cambiarla.	Vedetta suit la langue de macOS. Choisissez une langue pour la remplacer.
+Restart Vedetta to apply the new language.	Riavvia Vedetta per applicare la nuova lingua.	Redémarrez Vedetta pour appliquer la nouvelle langue.
+Restart now	Riavvia ora	Redémarrer maintenant
+Later	Più tardi	Plus tard
+Open Vedetta when the Mac starts	Apri Vedetta all'accensione del Mac	Ouvrir Vedetta au démarrage du Mac
+Keep running in the menu bar when the window is closed	Resta attiva nella barra dei menu quando chiudi la finestra	Rester active dans la barre des menus quand la fenêtre est fermée
+Notifications for motion, people and vehicles	Notifiche per movimento, persone e veicoli	Notifications pour les mouvements, personnes et véhicules
+Vedetta checks the recorder events every minute and notifies you. Click the notification to review the moment.	Vedetta controlla gli eventi del registratore ogni minuto e ti avvisa. Clicca la notifica per rivedere il momento.	Vedetta vérifie les événements de l'enregistreur chaque minute et vous avertit. Cliquez sur la notification pour revoir le moment.
+Lock the app with Touch ID or your Mac password	Blocca l'app con Touch ID o password del Mac	Verrouiller l'app avec Touch ID ou le mot de passe du Mac
+“Automatic” uses the light stream in small tiles and high quality when you enlarge: it uses less network and CPU.	«Automatica» usa il flusso leggero nei riquadri piccoli e l'alta qualità quando ingrandisci: consuma meno rete e CPU.	« Automatique » utilise le flux léger dans les petites cases et la haute qualité quand vous agrandissez : moins de réseau et de CPU.
+Fill the tiles (crop the edges)	Riempi i riquadri (ritaglia i bordi)	Remplir les cases (rogner les bords)
+Show codec, resolution and bitrate	Mostra codec, risoluzione e bitrate	Afficher le codec, la résolution et le débit
+Automatic tour every %@ seconds	Giro automatico ogni %@ secondi	Rotation automatique toutes les %@ secondes
+Live recordings	Registrazioni dal vivo	Enregistrements en direct
+Exports from the recorder	Esportazioni dal registratore	Exportations depuis l'enregistreur
+Change…	Cambia…	Modifier…
+Open in Finder	Apri nel Finder	Ouvrir dans le Finder
+Security	Sicurezza	Sécurité
+Device certificates	Certificati dei dispositivi	Certificats des appareils
+Forget	Dimentica	Oublier
+Certificates forgotten	Certificati dimenticati	Certificats oubliés
+They will be stored again at the next connection.	Verranno memorizzati di nuovo alla prossima connessione.	Ils seront de nouveau mémorisés à la prochaine connexion.
+Vedetta remembers each device's certificate at the first connection and warns you if it changes.	Vedetta memorizza il certificato di ogni dispositivo al primo collegamento e ti avvisa se cambia.	Vedetta mémorise le certificat de chaque appareil à la première connexion et vous avertit s'il change.
+Data	Dati	Données
+Recordings cache	Cache delle registrazioni	Cache des enregistrements
+Empty	Svuota	Vider
+Configuration	Configurazione	Configuration
+About	Informazioni	À propos
+Version	Versione	Version
+Video decoding	Decodifica video	Décodage vidéo
+Hardware (VideoToolbox)	Hardware (VideoToolbox)	Matériel (VideoToolbox)
+Source code	Codice sorgente	Code source
+Quit Vedetta	Esci da Vedetta	Quitter Vedetta
+%@ cameras online	%@ telecamere online	%@ caméras en ligne
+# --- Connection / device errors
+Invalid address. Enter the device IP address, for example 192.168.1.100.	Indirizzo non valido. Inserisci l'indirizzo IP del dispositivo, ad esempio 192.168.1.100.	Adresse non valide. Saisissez l'adresse IP de l'appareil, par exemple 192.168.1.100.
+Connected, but the device has no cameras.	Connesso, ma il dispositivo non ha telecamere collegate.	Connecté, mais l'appareil n'a aucune caméra.
+Wrong recorder user name or password.	Nome utente o password del registratore non corretti.	Nom d'utilisateur ou mot de passe de l'enregistreur incorrect.
+Recorder management interface not available: using ONVIF/RTSP only.	Interfaccia di gestione del registratore non disponibile: userò solo ONVIF/RTSP.	Interface de gestion de l'enregistreur indisponible : utilisation d'ONVIF/RTSP uniquement.
+Cannot communicate with the recorder at %@. Check address, user and password.	Impossibile comunicare con il registratore a %@. Controlla indirizzo, utente e password.	Impossible de communiquer avec l'enregistreur à %@. Vérifiez l'adresse, l'utilisateur et le mot de passe.
+The recorder rejected the video (RTSP) credentials. Check user and password.	Il registratore ha rifiutato le credenziali per il video (RTSP). Verifica utente e password.	L'enregistreur a refusé les identifiants vidéo (RTSP). Vérifiez l'utilisateur et le mot de passe.
+Video not verified yet: %@. Make sure RTSP is enabled on the recorder (port %@).	Video non ancora verificato: %@. Controlla che RTSP sia attivo sul registratore (porta %@).	Vidéo pas encore vérifiée : %@. Vérifiez que RTSP est activé sur l'enregistreur (port %@).
+Wrong recorder user name or password (ONVIF). On many recorders ONVIF access must be enabled and has its own user.	Nome utente o password del registratore non corretti (ONVIF). Su molti registratori l'accesso ONVIF va abilitato e ha un utente dedicato.	Nom d'utilisateur ou mot de passe de l'enregistreur incorrect (ONVIF). Sur de nombreux enregistreurs, l'accès ONVIF doit être activé et possède son propre utilisateur.
+Wrong camera user name or password (ONVIF). On some cameras the ONVIF user must be enabled in the settings.	Nome utente o password della telecamera non corretti (ONVIF). Su alcune telecamere l'utente ONVIF va abilitato nelle impostazioni.	Nom d'utilisateur ou mot de passe de la caméra incorrect (ONVIF). Sur certaines caméras, l'utilisateur ONVIF doit être activé dans les réglages.
+The device did not provide any streaming address.	Il dispositivo non ha fornito indirizzi di streaming.	L'appareil n'a fourni aucune adresse de diffusion.
+The recorder does not expose recordings over ONVIF (Profile G): live view works, playback does not. If it is Hikvision or Dahua, choose the brand in the advanced options.	Il registratore non espone le registrazioni via ONVIF (Profile G): la diretta funziona, la riproduzione no. Se è Hikvision o Dahua scegli la marca nelle opzioni avanzate.	L'enregistreur n'expose pas ses enregistrements via ONVIF (Profile G) : le direct fonctionne, la lecture non. S'il s'agit d'un Hikvision ou d'un Dahua, choisissez la marque dans les options avancées.
+The device rejected the video (RTSP) credentials.	Il dispositivo ha rifiutato le credenziali per il video (RTSP).	L'appareil a refusé les identifiants vidéo (RTSP).
+Video not verified yet: %@	Video non ancora verificato: %@	Vidéo pas encore vérifiée : %@
+Cannot find the ONVIF service on %@. Enable ONVIF in the recorder settings, or choose the brand in the advanced options to connect it over RTSP.	Non trovo il servizio ONVIF su %@. Attiva ONVIF nelle impostazioni del registratore, oppure scegli la marca nelle opzioni avanzate per collegarlo tramite RTSP.	Service ONVIF introuvable sur %@. Activez ONVIF dans les réglages de l'enregistreur ou choisissez la marque dans les options avancées pour le connecter via RTSP.
+No camera found on %@ with the %@ layout: %@	Nessuna telecamera trovata su %@ con il formato %@: %@	Aucune caméra trouvée sur %@ avec le format %@ : %@
+For %@ over RTSP only live view is available. Enable ONVIF on the recorder to review recordings.	Per %@ via RTSP è disponibile solo la diretta. Attiva ONVIF sul registratore per rivedere le registrazioni.	Pour %@ via RTSP, seul le direct est disponible. Activez ONVIF sur l'enregistreur pour revoir les enregistrements.
+Wrong user name or password.	Nome utente o password non corretti.	Nom d'utilisateur ou mot de passe incorrect.
+Wrong user name or password	Nome utente o password non corretti	Nom d'utilisateur ou mot de passe incorrect
+If you denied Vedetta access to the local network, turn it back on in System Settings › Privacy & Security › Local Network.	Se hai negato a Vedetta l'accesso alla rete locale, riattivalo in Impostazioni di Sistema › Privacy e sicurezza › Rete locale.	Si vous avez refusé à Vedetta l'accès au réseau local, réactivez-le dans Réglages Système › Confidentialité et sécurité › Réseau local.
+Network unreachable: check Vedetta's Local Network permission	Rete non raggiungibile: controlla il permesso Rete locale di Vedetta	Réseau inaccessible : vérifiez l'autorisation Réseau local de Vedetta
+The security certificate of %@ has changed. If you replaced or reset the device, confirm the new certificate in the device settings.	Il certificato di sicurezza di %@ è cambiato. Se hai sostituito o ripristinato il dispositivo, conferma il nuovo certificato nelle impostazioni del dispositivo.	Le certificat de sécurité de %@ a changé. Si vous avez remplacé ou réinitialisé l'appareil, confirmez le nouveau certificat dans les réglages de l'appareil.
+Invalid recorder response	Risposta del registratore non valida	Réponse de l'enregistreur non valide
+Too many login attempts. Try again in %@ minutes.	Troppi tentativi di accesso. Riprova tra %@ minuti.	Trop de tentatives de connexion. Réessayez dans %@ minutes.
+The recorder returned error %@	Il registratore ha risposto con l'errore %@	L'enregistreur a renvoyé l'erreur %@
+Feature not supported by this device	Funzione non supportata da questo dispositivo	Fonction non prise en charge par cet appareil
+Recorder not reachable (%@): %@	Registratore non raggiungibile (%@): %@	Enregistreur injoignable (%@) : %@
+Device not reachable: %@	Dispositivo non raggiungibile: %@	Appareil injoignable : %@
+Wrong user name or password (ONVIF)	Nome utente o password non corretti (ONVIF)	Nom d'utilisateur ou mot de passe incorrect (ONVIF)
+ONVIF error: %@	Errore ONVIF: %@	Erreur ONVIF : %@
+Invalid ONVIF response	Risposta ONVIF non valida	Réponse ONVIF non valide
+Feature not supported: %@	Funzione non supportata: %@	Fonction non prise en charge : %@
+Preset %@	Preset %@	Préréglage %@
+recording search	ricerca registrazioni	recherche d'enregistrements
+event search	ricerca eventi	recherche d'événements
+playback	riproduzione	lecture
+Invalid stream address	Indirizzo dello stream non valido	Adresse de flux non valide
+Connection failed: %@	Connessione non riuscita: %@	Échec de la connexion : %@
+No response (%@)	Nessuna risposta (%@)	Aucune réponse (%@)
+Device error %@ %@	Errore del dispositivo %@ %@	Erreur de l'appareil %@ %@
+Unsupported video format	Formato video non supportato	Format vidéo non pris en charge
+Connection closed by the device	Connessione chiusa dal dispositivo	Connexion fermée par l'appareil
+connection to %@	connessione a %@	connexion à %@
+Cannot create the video file: %@	Impossibile creare il file video: %@	Impossible de créer le fichier vidéo : %@
+video track not supported	traccia video non supportata	piste vidéo non prise en charge
+unknown error	errore sconosciuto	erreur inconnue
+no frames received	nessun fotogramma ricevuto	aucune image reçue
+writing not completed	scrittura non completata	écriture non terminée
+waiting for video	in attesa del video	en attente de la vidéo
+Reconnecting…	Riconnessione…	Reconnexion…
+Connection interrupted	Connessione interrotta	Connexion interrompue
+No video signal	Nessun segnale video	Aucun signal vidéo
+# --- Info.plist
+Vedetta connects to the recorder and cameras on your network to show you live video and recordings.	Vedetta si collega al registratore e alle telecamere della tua rete per mostrarti il video in diretta e le registrazioni.	Vedetta se connecte à l'enregistreur et aux caméras de votre réseau pour afficher la vidéo en direct et les enregistrements.
+offline	offline	hors ligne

@@ -1,0 +1,18 @@
+# Build products
+.build/
+.swiftpm/
+dist/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+
+# Local test bench (credentials, logs, generated certificates, Python venv)
+scripts/testenv/
+/auto.crt
+/auto.key
+
+# Private notes and research (never published)
+private/
+
+.DS_Store
+*.log

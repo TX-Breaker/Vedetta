@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "Vedetta";
+"CFBundleName" = "Vedetta";
+"NSLocalNetworkUsageDescription" = "Vedetta se connecte à l'enregistreur et aux caméras de votre réseau pour afficher la vidéo en direct et les enregistrements.";

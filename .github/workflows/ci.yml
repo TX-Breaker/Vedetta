@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer && xcodebuild -version
+      - name: Check translations
+        run: python3 scripts/l10n.py --check
+      - name: Build
+        run: swift build
+      - name: Unit tests
+        run: swift test
+      - name: Build the app bundle
+        run: scripts/build-app.sh

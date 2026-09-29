@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleLocalizations</key><array><string>en</string><string>it</string><string>fr</string></array>
+	<key>CFBundleName</key><string>Vedetta</string>
+	<key>CFBundleDisplayName</key><string>Vedetta</string>
+	<key>CFBundleIdentifier</key><string>it.vedetta.app</string>
+	<key>CFBundleExecutable</key><string>Vedetta</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>__VERSION__</string>
+	<key>CFBundleVersion</key><string>__BUILD__</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleIconName</key><string>AppIcon</string>
+	<key>LSMinimumSystemVersion</key><string>26.0</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.video</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<key>NSPrincipalClass</key><string>NSApplication</string>
+	<key>NSSupportsAutomaticTermination</key><false/>
+	<key>NSSupportsSuddenTermination</key><false/>
+	<key>NSHumanReadableCopyright</key><string>Vedetta — native Mac client for NVRs and IP cameras (VIGI, ONVIF, RTSP). MIT License.</string>
+	<key>NSLocalNetworkUsageDescription</key><string>Vedetta connects to the recorder and cameras on your network to show you live video and recordings.</string>
+	<key>NSBonjourServices</key><array/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key><true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key><true/>
+		<key>NSAllowsLocalNetworking</key><true/>
+	</dict>
+</dict>
+</plist>

@@ -1,0 +1,31 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you expected and what you saw.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Recorder / camera
+      description: Brand, model and firmware (e.g. VIGI NVR2016H 1.20, Hikvision DS-7608NI-K2 V4.x)
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How is it connected?
+      options: [VIGI NVR, NVR of another brand (ONVIF), NVR of another brand (RTSP brand layout), ONVIF camera, RTSP address]
+  - type: input
+    id: versions
+    attributes:
+      label: Vedetta and macOS versions
+      placeholder: Vedetta 1.0.0, macOS 26.x
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages
+      description: Copy any message shown by the app. Never paste passwords, public IP addresses or serial numbers.

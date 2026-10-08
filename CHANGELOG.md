@@ -47,3 +47,7 @@ First public release.
 ### Fixed (before release)
 - RTSP TEARDOWN was never sent when a stream closed, leaving sessions open on the recorder.
 - A refused RTSP password was sent twice on the same connection.
+- Live view stayed on "Connecting…" after closing the window with the red button and reopening it from the Dock
+  within a few seconds (a paused stream was handed back to the new window without being restarted).
+- When another app signed in with the same recorder user and kept closing Vedetta's session, Vedetta logged in again
+  every minute; it now spaces the new logins out (5 s … 5 min) while sessions keep being taken over.

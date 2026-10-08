@@ -9,6 +9,7 @@
 | "The recorder locked this user…" / the NVR buzzer sounds | Too many failed logins (possibly from other apps using the same user). Vedetta attempts nothing until the unlock time. Unlock the user on the recorder's own screen or restart it, then use a dedicated user — see [account-protection.md](account-protection.md). |
 | "Recorder not reachable. Vedetta checks again at…" | The recorder does not answer (switched off, network problem, address changed). Vedetta checks it without the password with growing pauses; **Check Now** in the banner forces a check. The video comes back by itself. |
 | Some tiles have black bars / are narrower | Their sub-stream is 4:3 (e.g. 640×480) while the tiles are 16:9. On the recorder set the camera's **sub-stream** to a 16:9 resolution (e.g. 640×360). Or Quality › Picture in the tiles › **Stretch**. **Fill** crops the edges, including the camera clock. |
+| Connection log shows "session closed by the recorder" and a login almost every minute | Another app (VIGI mobile app, web interface, VIGI Security Manager…) is signed in with the same user and takes the session over. Vedetta spaces its logins out, but give Vedetta a user of its own. |
 | Camera name not visible on the tiles | Quality › Camera names › **Always**. |
 | "Access to this camera was refused" on one tile | The user has no permission for that camera. Grant it on the recorder or hide the camera (Devices). |
 | Snapshot/recording quality | They always use the main (full-quality) stream. If a camera's main stream is low, raise it on the recorder. |

@@ -156,13 +156,18 @@ class H(BaseHTTPRequestHandler):
                         '<wsnt:Message><tt:Message UtcTime="%s"><tt:Source/><tt:Data><tt:SimpleItem Name="%s" Value="%s"/></tt:Data></tt:Message></wsnt:Message></tt:Event>'
                         '<tt:StartStateEvent>%s</tt:StartStateEvent></tt:Result>') % (rec, iso(t), topic, iso(t), name, value, "true" if start else "false")
             now = time.time()
+            # A recording gap and two detections, always in the past: at the usual hours (07:00, 09:00, 11:00) late
+            # in the day, proportionally earlier just after midnight (so "today" always has two segments).
+            elapsed = max(60.0, now - base)
+            def at(hours):
+                return base + (hours * 3600 if elapsed >= 12 * 3600 else elapsed * hours / 12)
             items = [result(base, "tns1:RecordingHistory/Track/State", "IsDataPresent", "true", True),
-                     result(base + 7 * 3600, "tns1:RecordingHistory/Track/State", "IsDataPresent", "false"),
-                     result(base + 7.5 * 3600, "tns1:RecordingHistory/Track/State", "IsDataPresent", "true"),
-                     result(base + 9 * 3600, "tns1:VideoSource/MotionAlarm", "State", "true"),
-                     result(base + 9 * 3600 + 40, "tns1:VideoSource/MotionAlarm", "State", "false"),
-                     result(base + 11 * 3600, "tns1:RuleEngine/LineDetector/Crossed", "State", "true"),
-                     result(base + 11 * 3600 + 5, "tns1:RuleEngine/LineDetector/Crossed", "State", "false")]
+                     result(at(7), "tns1:RecordingHistory/Track/State", "IsDataPresent", "false"),
+                     result(at(7.5), "tns1:RecordingHistory/Track/State", "IsDataPresent", "true"),
+                     result(at(9), "tns1:VideoSource/MotionAlarm", "State", "true"),
+                     result(at(9) + 40, "tns1:VideoSource/MotionAlarm", "State", "false"),
+                     result(at(11), "tns1:RuleEngine/LineDetector/Crossed", "State", "true"),
+                     result(at(11) + 5, "tns1:RuleEngine/LineDetector/Crossed", "State", "false")]
             items = [i for i in items if re.search(r"<tt:Time>([^<]+)<", i) and
                      datetime.strptime(re.search(r"<tt:Time>([^<]+)<", i).group(1), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp() <= now]
             return self.send(env('<tse:GetEventSearchResultsResponse><tse:ResultList><tt:SearchState>Completed</tt:SearchState>%s</tse:ResultList>'

@@ -15,7 +15,7 @@ the account by itself. Vedetta is built so that this cannot happen. This page ex
 | User locked by the recorder | Everything stops. If the recorder says when it unlocks, Vedetta waits until then and makes **one** attempt; otherwise it waits for you. |
 | Password not available (Keychain access denied) | Nothing is attempted — never a login with an empty password. Sign-in screen. |
 | One camera refuses the video (user without permission for it) | Only that camera stops; Vedetta first checks with a request every user may make that the password itself is still valid. |
-| Session closed right after logging in (same user in another app) | No ping-pong of logins: the next login waits 5 s, 10 s, 20 s… |
+| Sessions keep being closed soon after the login (same user signed in from another app) | No ping-pong of logins: new logins are spaced out 5 s, 10 s, 20 s… up to 5 minutes, and the log says "closed by the recorder … same user signed in elsewhere?". Give Vedetta its own user. |
 | Several features at once | One shared session per recorder for live view, recordings, events and exports. |
 
 RTSP video needs its own authentication for each stream (the protocol cannot reuse the web session). Streams start

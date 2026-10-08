@@ -111,6 +111,8 @@ final class SelfTest {
         }
 
         await testLive(dev: dev, online: online)
+        await testWindowReopen()
+        if env["VEDETTA_SELFTEST_SCENARIO"] == "reopen" { return finish(rss0: rss0) }
         await testLiveUI(dev: dev)
         await testSections()
         if dev.supportsPlayback {
@@ -338,6 +340,42 @@ final class SelfTest {
         await sleep(6)
         let released = model.pool.existing(key: AppModel.streamKey(dev, ch, .main)) == nil || model.layout.grid == .one
         check("live-hd-stream-released", released, "main stream closed after the capture")
+    }
+
+    // MARK: Close the window with the red button, reopen it from the Dock
+
+    /// The Dock sends this Apple event when its icon is clicked; sent to this process only.
+    private func reopenFromDock() {
+        let me = NSAppleEventDescriptor(processIdentifier: ProcessInfo.processInfo.processIdentifier)
+        let ev = NSAppleEventDescriptor(eventClass: AEEventClass(kCoreEventClass), eventID: AEEventID(kAEReopenApplication),
+                                        targetDescriptor: me, returnID: AEReturnID(kAutoGenerateReturnID),
+                                        transactionID: AETransactionID(kAnyTransactionID))
+        _ = try? ev.sendEvent(options: [.noReply], timeout: 5)
+    }
+
+    private func playingCount() -> Int { model.pool.activeStreams.filter { $0.status.isPlaying }.count }
+
+    private func testWindowReopen() async {
+        model.section = .live
+        guard await waitUntil(20, { self.playingCount() > 0 }) else { return check("window-reopen", false, "no stream playing before the test") }
+        let before = playingCount()
+        model.autoSuspendEnabled = true          // as for the user: closing the window pauses the video
+        defer { model.autoSuspendEnabled = false }
+        for (name, pause) in [("window-reopen", 8.0), ("window-reopen-quick", 1.5)] {
+            guard let w = mainWindow else { check(name, false, "no window"); continue }
+            w.performClose(nil)
+            let closed = await waitUntil(5) { !w.isVisible }
+            let paused = await waitUntil(5) { self.model.pool.isSuspended }
+            await sleep(pause)
+            reopenFromDock()
+            let reopened = await waitUntil(10) { self.mainWindow?.isVisible == true }
+            mainWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            let back = await waitUntil(40) { self.playingCount() >= before }
+            let phases = model.pool.activeStreams.map { "\($0.title): \($0.status.phase)" }.joined(separator: "; ")
+            check(name, closed && paused && reopened && back,
+                  "closed \(closed), paused \(paused), reopened \(reopened), playing \(playingCount())/\(before), suspended \(model.pool.isSuspended) — \(phases)")
+        }
     }
 
     private func waitUntilValue<T>(_ timeout: Double, _ get: () -> T?) async -> T? {

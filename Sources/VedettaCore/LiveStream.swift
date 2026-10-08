@@ -495,6 +495,9 @@ public final class StreamPool {
             e.stopWork?.cancel()
             e.stopWork = nil
             entries[key] = e
+            // A lingering stream may have been stopped meanwhile (window closed → suspend): start it again.
+            // (start() does nothing when it is already running.)
+            if !isSuspended { e.stream.start() }
             return e.stream
         }
         if let old = entries[key] { old.stream.stop() }

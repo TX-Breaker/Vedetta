@@ -89,6 +89,7 @@ scripts/regression.sh selftest     # only the in-app self tests
 scripts/regression.sh vigi         # only the VIGI self test (~5 minutes)
 scripts/regression.sh resilience   # only the account-protection scenario (~9 minutes)
 scripts/regression.sh perf         # only the 16-camera performance and idle checks (~2 minutes)
+scripts/regression.sh reopen       # only: close the window, reopen it from the Dock, video comes back (~2 minutes)
 ```
 
 Report: `scripts/testenv/regression-report.txt`. Sections: build · unit tests and translations · test bench ·

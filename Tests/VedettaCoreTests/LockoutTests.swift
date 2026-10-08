@@ -369,7 +369,54 @@ import RTSPKit
         DeviceClients.shared.forget(id)
     }
 
+    /// Another app with the same user takes the session over every minute: Vedetta must not log in every minute.
+    @Test func sessionsTakenOverRepeatedlySlowDownTheLogins() async throws {
+        let clock = ManualClock()
+        let nvr = FakeNVR(clock: clock, users: ["viewer": "right"])
+        let g = makeGuard(clock, nvr)
+        let c = VigiClient(host: "nvr.test", username: "viewer", password: "right", accessGuard: g, transport: nvr)
+        try await c.ensureSession()
+        for _ in 0..<30 {                                    // 30 minutes, event polling every minute
+            await clock.advance(by: 50)
+            nvr.expireSessions()                             // the other app logs in and closes ours
+            await clock.advance(by: 10)
+            await burst(c, 3)
+        }
+        #expect(nvr.failedLogins == 0 && g.state == .online)
+        #expect(nvr.loginAttempts <= 15, "logins \(nvr.loginAttempts)")   // not 31
+    }
+
     // MARK: Streams
+
+    /// Window closed (suspend) and reopened before the stream was dropped: the stream must start again.
+    @MainActor
+    @Test func streamReacquiredAfterSuspendStartsAgain() async throws {
+        let rtsp = FakeRTSPServer(users: ["viewer": "right"])
+        try await rtsp.start()
+        defer { rtsp.stop() }
+        let pool = StreamPool()
+        let url = URL(string: "rtsp://127.0.0.1:\(rtsp.port)/live/1/2/avm")!
+        let creds = Credentials(username: "viewer", password: "right")
+        func waitFor(_ cond: () -> Bool) async -> Bool {
+            for _ in 0..<80 { if cond() { return true }; try? await Task.sleep(nanoseconds: 50_000_000) }
+            return cond()
+        }
+        var s = pool.acquire(key: "k", url: url, credentials: creds, title: "Cam")
+        #expect(await waitFor { rtsp.activeUsers.count == 1 })
+        pool.suspend()                                         // window closed
+        pool.release(s)                                        // its tiles go away (stream lingers a few seconds)
+        #expect(await waitFor { rtsp.activeUsers.isEmpty })
+        pool.resume()                                          // window reopened…
+        s = pool.acquire(key: "k", url: url, credentials: creds, title: "Cam")   // …and its tile comes back
+        #expect(await waitFor { rtsp.activeUsers.count == 1 }, "phase \(s.status.phase)")
+        // Reverse order: the tile comes back while still suspended, then the window becomes visible.
+        pool.suspend(); pool.release(s)
+        #expect(await waitFor { rtsp.activeUsers.isEmpty })
+        s = pool.acquire(key: "k", url: url, credentials: creds, title: "Cam")
+        pool.resume()
+        #expect(await waitFor { rtsp.activeUsers.count == 1 }, "phase \(s.status.phase)")
+        pool.stopAll()
+    }
 
     @MainActor
     @Test func camerasStartingTogetherWithAWrongPasswordFailOnlyOnce() async throws {

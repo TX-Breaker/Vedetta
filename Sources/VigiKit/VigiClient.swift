@@ -189,12 +189,17 @@ public actor VigiClient {
             // Only the first request that finds this session closed handles it (parallel requests share the result).
             if stok == token {
                 stok = nil
-                if let last = lastLogin, now.timeIntervalSince(last) < 30 {
-                    // Closed right after logging in: another client with the same user? Do not ping-pong.
-                    conflicts += 1
-                    let wait = (accessGuard?.backoff ?? .standard).delay(attempt: conflicts - 1, random: Double.random(in: 0...1))
-                    nextLoginAllowed = now.addingTimeInterval(wait)
-                    accessGuard?.note("session", "closed by the recorder", "new login not before \(Int(wait)) s")
+                if let last = lastLogin {
+                    // Sessions that keep dying soon after the login: another client with the same user is
+                    // probably taking over. Do not ping-pong: re-login with growing pauses (5 s … 5 min).
+                    let lived = now.timeIntervalSince(last)
+                    conflicts = lived < 300 ? conflicts + 1 : 0
+                    if lived < 30 || conflicts >= 2 {
+                        let wait = (accessGuard?.backoff ?? .standard).delay(attempt: max(0, conflicts - 1), random: Double.random(in: 0...1))
+                        nextLoginAllowed = now.addingTimeInterval(wait)
+                        accessGuard?.note("session", "closed by the recorder",
+                                          "\(Int(lived)) s after login (same user signed in elsewhere?); new login not before \(Int(wait)) s")
+                    }
                 }
             }
             if conflicts > 0, let next = nextLoginAllowed, now < next { throw VigiError.sessionConflict(retryAt: next) }

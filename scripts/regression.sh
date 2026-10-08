@@ -7,6 +7,7 @@
 #        scripts/regression.sh resilience   only the account-protection scenario (~8 minutes)
 #        scripts/regression.sh vigi         only the VIGI in-app self test (~5 minutes)
 #        scripts/regression.sh perf         only the 16-camera performance and idle checks (~2 minutes)
+#        scripts/regression.sh reopen       only: close the window, reopen it from the Dock, video back (~2 minutes)
 # Report: scripts/testenv/regression-report.txt
 setopt NO_NOMATCH
 ROOT=${0:A:h:h}
@@ -148,6 +149,11 @@ PY
   log "  · CPU $name: average $(( samples ? sum / samples : 0 ))%, peak ${maxcpu}%"
 }
 if [[ $QUICK != resilience && $QUICK != perf ]]; then
+  if [[ $QUICK == reopen ]]; then
+    log "[6] In-app self test — close and reopen the window"
+    run_selftest reopen-it $ENV/devconfig.json it reopen
+    log "== Result: $NPASS passed, $NFAIL failed"; pkill -f mock_nvr.py; pkill -f mock_onvif.py; scripts/test-rtsp-server.sh stop >/dev/null 2>&1; exit $(( NFAIL > 0 ))
+  fi
   log "[6] In-app self test — VIGI recorder (Italian, English)"
   run_selftest vigi-it $ENV/devconfig.json it
   [[ $QUICK == vigi ]] && { log "== Result: $NPASS passed, $NFAIL failed"; pkill -f mock_nvr.py; pkill -f mock_onvif.py; scripts/test-rtsp-server.sh stop >/dev/null 2>&1; exit $(( NFAIL > 0 )); }

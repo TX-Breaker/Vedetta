@@ -514,3 +514,9 @@ Zoom in the timeline (+)	Ingrandisci la timeline (+)	Agrandir la chronologie (+)
 Zoom out the timeline (–)	Riduci la timeline (–)	Réduire la chronologie (–)
 Zoom the timeline in / out	Ingrandisci / riduci la timeline	Agrandir / réduire la chronologie
 settings	impostazioni	réglages
+%@: the recorder has reached its bandwidth limit, so the HD stream is not available now.	%@: il registratore ha raggiunto il limite di banda, quindi il flusso HD ora non è disponibile.	%@ : l'enregistreur a atteint sa limite de bande passante, le flux HD n'est donc pas disponible pour le moment.
+Light stream: the recorder has reached its bandwidth limit and refused HD. Vedetta tries HD again in a few minutes.	Flusso leggero: il registratore ha raggiunto il limite di banda e ha rifiutato l'HD. Vedetta riprova l'HD tra qualche minuto.	Flux léger : l'enregistreur a atteint sa limite de bande passante et a refusé la HD. Vedetta réessaie la HD dans quelques minutes.
+Recording at reduced quality	Registrazione a qualità ridotta	Enregistrement en qualité réduite
+Snapshot at reduced quality	Istantanea a qualità ridotta	Capture en qualité réduite
+The recorder has reached its bandwidth limit (%@).	Il registratore ha raggiunto il limite di banda (%@).	L'enregistreur a atteint sa limite de bande passante (%@).
+The recorder has reached its bandwidth limit (%@). Retrying…	Il registratore ha raggiunto il limite di banda (%@). Nuovo tentativo…	L'enregistreur a atteint sa limite de bande passante (%@). Nouvelle tentative…

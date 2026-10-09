@@ -203,6 +203,8 @@ final class FakeRTSPServer: @unchecked Sendable {
     var users: [String: String]
     /// Paths each user may open (nil = all), like a recorder user limited to some cameras.
     var permissions: [String: [String]] = [:]
+    /// Paths refused at PLAY with this status line (e.g. "509 Bandwidth Limit Exceeded").
+    var refusePlay: [String: String] = [:]
     private(set) var port: UInt16 = 0
     private(set) var connections = 0
     private(set) var refusedCredentials = 0
@@ -293,6 +295,7 @@ final class FakeRTSPServer: @unchecked Sendable {
         case "SETUP":
             send("200 OK", ["Transport: RTP/AVP/TCP;unicast;interleaved=0-1", "Session: 4242;timeout=60"])
         case "PLAY":
+            if let status = lock.withLock({ refusePlay.first { url.contains($0.key) }?.value }) { return send(status) }
             lock.withLock { playing[ObjectIdentifier(c)] = user }
             send("200 OK", ["Session: 4242", "Range: npt=0.000-"])
         case "TEARDOWN":

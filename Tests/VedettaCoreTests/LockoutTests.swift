@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreGraphics
 import NetKit
 import RTSPKit
 @testable import VigiKit
@@ -415,6 +416,37 @@ import RTSPKit
         s = pool.acquire(key: "k", url: url, credentials: creds, title: "Cam")
         pool.resume()
         #expect(await waitFor { rtsp.activeUsers.count == 1 }, "phase \(s.status.phase)")
+        pool.stopAll()
+    }
+
+    /// The recorder refuses the HD stream for bandwidth (RTSP 509): the stream says so at once,
+    /// a pending recording fails immediately (to fall back to the light stream) and snapshots give up.
+    @MainActor
+    @Test func bandwidthLimitIsReportedAndCapturesGiveUpQuickly() async throws {
+        let rtsp = FakeRTSPServer(users: ["viewer": "right"])
+        rtsp.refusePlay = ["/live/1/1/": "509 Bandwidth Limit Exceeded"]
+        try await rtsp.start()
+        defer { rtsp.stop() }
+        let pool = StreamPool()
+        let creds = Credentials(username: "viewer", password: "right")
+        let hd = pool.acquire(key: "hd", url: URL(string: "rtsp://127.0.0.1:\(rtsp.port)/live/1/1/avm")!, credentials: creds, title: "Street")
+        let t0 = Date()
+        let recErr: Error? = await withCheckedContinuation { c in
+            hd.startRecording(to: FileManager.default.temporaryDirectory.appendingPathComponent("hd-\(UUID()).mp4"), wait: 15) { c.resume(returning: $0) }
+        }
+        #expect(Date().timeIntervalSince(t0) < 5, "recording waited \(Date().timeIntervalSince(t0)) s")
+        guard case LiveStreamError.bandwidthLimited(509)? = recErr else { Issue.record("error \(String(describing: recErr))"); return }
+        #expect(hd.isBandwidthLimited)
+        for _ in 0..<40 where !hd.status.bandwidthLimited { try? await Task.sleep(nanoseconds: 50_000_000) }
+        #expect(hd.status.bandwidthLimited)
+        let t1 = Date()
+        let img: CGImage? = await withCheckedContinuation { c in hd.snapshotWhenReady(wait: 8) { c.resume(returning: $0) } }
+        #expect(img == nil && Date().timeIntervalSince(t1) < 2)
+        // The light stream of the same camera still plays.
+        _ = pool.acquire(key: "sd", url: URL(string: "rtsp://127.0.0.1:\(rtsp.port)/live/1/2/avm")!, credentials: creds, title: "Street")
+        var playing = false
+        for _ in 0..<60 { if rtsp.activeUsers.count == 1 { playing = true; break }; try? await Task.sleep(nanoseconds: 50_000_000) }
+        #expect(playing)
         pool.stopAll()
     }
 

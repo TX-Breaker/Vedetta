@@ -336,6 +336,15 @@ struct VideoTile: View {
         .onDisappear { controller.unbind() }
         .onChange(of: size.width) { _, _ in rebind() }
         .onChange(of: model.accessState(device).needsUser) { _, _ in rebind() }
+        // HD refused by the recorder (bandwidth limit): switch to the light stream, try HD again later.
+        .onChange(of: controller.stream?.status.bandwidthLimited == true) { _, limited in
+            if limited, kind == .main { model.noteBandwidthLimit(channel); rebind() }
+        }
+        .task(id: model.hdLimitedUntil[channel.id]) {
+            guard let until = model.hdLimitedUntil[channel.id] else { return }
+            try? await Task.sleep(nanoseconds: UInt64(max(0, until.timeIntervalSinceNow) * 1_000_000_000) + 1_000_000_000)
+            if !Task.isCancelled { rebind() }
+        }
         .onChange(of: model.settings.tileFit, initial: true) { _, v in
             switch v {
             case .fit: controller.view.gravity = .resizeAspect
@@ -349,7 +358,7 @@ struct VideoTile: View {
     private func rebind() {
         // Waiting for the user (refused, locked, signed out): no stream with credentials that do not work.
         guard !model.accessState(device).needsUser else { controller.unbind(); return }
-        let newKind = model.streamKind(forTileWidth: size.width)
+        let newKind = model.streamKind(for: channel, tileWidth: size.width)
         if controller.stream == nil || newKind != kind {
             kind = newKind
             controller.bind(pool: model.pool, device: device, channel: channel, kind: kind)
@@ -365,6 +374,11 @@ struct VideoTile: View {
                 HStack(spacing: 6) {
                     StatusDot(color: dotColor(status), pulsing: recording != nil)
                     Text(channel.name).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                    if model.isHDLimited(channel), size.width * (NSScreen.main?.backingScaleFactor ?? 2) >= 1400 {
+                        Image(systemName: "gauge.with.dots.needle.33percent")
+                            .font(.system(size: 11, weight: .semibold))
+                            .help(L("Light stream: the recorder has reached its bandwidth limit and refused HD. Vedetta tries HD again in a few minutes."))
+                    }
                     if let recording {
                         RecordingBadge(start: recording.started)
                     }

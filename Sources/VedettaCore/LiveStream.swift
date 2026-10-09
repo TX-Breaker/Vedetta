@@ -23,6 +23,8 @@ public final class StreamStatus {
     public var isRecording = false
     public var recordingStarted: Date?
     public var audioEnabled = false
+    /// The recorder refused this stream for lack of bandwidth (RTSP 509 / 453).
+    public var bandwidthLimited = false
 
     public init() {}
 
@@ -34,6 +36,16 @@ public final class StreamStatus {
         case .playing: return nil
         case .reconnecting(let s): return s
         case .failed(let s): return s
+        }
+    }
+}
+
+public enum LiveStreamError: LocalizedError {
+    /// RTSP 509 "Bandwidth Limit Exceeded" / 453 "Not Enough Bandwidth": the recorder's outgoing limit is reached.
+    case bandwidthLimited(Int)
+    public var errorDescription: String? {
+        switch self {
+        case .bandwidthLimited(let code): return L("The recorder has reached its bandwidth limit (%@).", String(code))
         }
     }
 }
@@ -86,6 +98,10 @@ public final class LiveStream: @unchecked Sendable {
     private var pendingReconnect: DispatchWorkItem?
     private var pendingRecording: (url: URL, completion: @Sendable (Error?) -> Void)?
     private var guardObserver: UUID?
+    private let limitLock = NSLock()
+    private var _bandwidthLimited = false
+    /// Last stream error written to the connection log (each new error once, not every retry).
+    private var lastLoggedError: String?
     /// Waiting for the AccessGuard to allow connections again.
     private var waitingForAccess = false
 
@@ -221,8 +237,29 @@ public final class LiveStream: @unchecked Sendable {
         }
     }
 
+    /// True while the recorder refuses this stream for bandwidth (readable from any thread).
+    public var isBandwidthLimited: Bool { limitLock.withLock { _bandwidthLimited } }
+
     private func connectFailed(_ error: Error) {
         if let blocked = error as? AccessBlocked { return waitForAccess(blocked.state) }
+        if case RTSPError.status(let code, let reason) = error {
+            if lastLoggedError != "\(code)" {
+                lastLoggedError = "\(code)"
+                accessGuard?.note("RTSP \(title)", "error \(code)", reason)
+            }
+            if code == 509 || code == 453 {
+                // Outgoing bandwidth limit of the recorder: whoever waits for a picture gives up now
+                // (the tile switches to the light stream, captures use what is available).
+                limitLock.withLock { _bandwidthLimited = true }
+                DispatchQueue.main.async { self.status.bandwidthLimited = true }
+                if let p = pendingRecording {
+                    pendingRecording = nil
+                    p.completion(LiveStreamError.bandwidthLimited(code))
+                }
+                scheduleReconnect(reason: L("The recorder has reached its bandwidth limit (%@). Retrying…", String(code)))
+                return
+            }
+        }
         if case RTSPError.unauthorized = error {
             client?.stop(); client = nil
             generation += 1
@@ -351,6 +388,11 @@ public final class LiveStream: @unchecked Sendable {
         if !gotFirstFrame {
             gotFirstFrame = true
             attempt = 0
+            lastLoggedError = nil
+            if isBandwidthLimited {
+                limitLock.withLock { _bandwidthLimited = false }
+                DispatchQueue.main.async { self.status.bandwidthLimited = false }
+            }
             setPhase(.playing)
         }
         if au.isKeyframe, let p = pendingRecording {
@@ -407,6 +449,7 @@ public final class LiveStream: @unchecked Sendable {
     public func startRecording(to url: URL, wait: TimeInterval = 0, completion: @escaping @Sendable (Error?) -> Void) {
         queue.async { [self] in
             guard format != nil, !gopAUs.isEmpty || wait <= 0 else {
+                if isBandwidthLimited { completion(LiveStreamError.bandwidthLimited(509)); return }
                 guard wait > 0 else { completion(RecorderError.cannotCreate(L("waiting for video"))); return }
                 pendingRecording = (url, completion)
                 queue.asyncAfter(deadline: .now() + wait) { [weak self] in
@@ -445,12 +488,13 @@ public final class LiveStream: @unchecked Sendable {
     }
 
     /// Snapshot as soon as a full picture is available (stream just opened), or nil after `wait` seconds.
+    /// Gives up at once when the recorder refuses the stream for bandwidth.
     public func snapshotWhenReady(wait: TimeInterval, completion: @escaping @Sendable (CGImage?) -> Void) {
         let deadline = Date().addingTimeInterval(wait)
         func attempt() {
             snapshot { img in
                 if let img { return completion(img) }
-                guard Date() < deadline else { return completion(nil) }
+                guard Date() < deadline, !self.isBandwidthLimited else { return completion(nil) }
                 DispatchQueue.global().asyncAfter(deadline: .now() + 0.25) { attempt() }
             }
         }

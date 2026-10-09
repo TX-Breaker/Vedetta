@@ -355,6 +355,24 @@ final class AppModel {
         tourTimer = t
     }
 
+    /// Channels whose HD stream the recorder refused for bandwidth (509/453): light stream until that date.
+    var hdLimitedUntil: [String: Date] = [:]
+
+    func isHDLimited(_ ch: Channel) -> Bool { (hdLimitedUntil[ch.id] ?? .distantPast) > Date() }
+
+    /// The recorder refused the HD stream of a channel: use the light one for 10 minutes, then try HD again.
+    func noteBandwidthLimit(_ ch: Channel) {
+        guard !isHDLimited(ch) else { return }
+        hdLimitedUntil[ch.id] = Date().addingTimeInterval(600)
+        if let d = device(for: ch) {
+            DeviceClients.shared.accessGuard(for: d).note("RTSP \(ch.name)", "bandwidth limit", "HD refused by the recorder (509): light stream for 10 minutes")
+        }
+    }
+
+    func streamKind(for ch: Channel, tileWidth width: CGFloat) -> StreamKind {
+        isHDLimited(ch) ? .sub : streamKind(forTileWidth: width)
+    }
+
     func streamKind(forTileWidth width: CGFloat) -> StreamKind {
         switch settings.liveQuality {
         case .high: return .main
@@ -430,13 +448,37 @@ final class AppModel {
                 if let err {
                     if self.liveRecordings[channel.id]?.url == url { self.liveRecordings[channel.id] = nil }
                     self.pool.release(s)
-                    self.toast(.error, L("Cannot record"), err.localizedDescription)
+                    if case LiveStreamError.bandwidthLimited = err {
+                        // HD refused by the recorder: record the light stream rather than nothing.
+                        self.noteBandwidthLimit(channel)
+                        self.startReducedRecording(channel: channel, device: device, url: url)
+                    } else {
+                        self.toast(.error, L("Cannot record"), err.localizedDescription)
+                    }
                 } else {
                     self.liveRecordings[channel.id]?.started = Date()
                     let res = s.status.resolution
                     self.toast(.info, L("Recording started"), res == .zero
                                ? L("%@ — the file is being saved on this Mac", channel.name)
                                : L("%@ — full quality (%@), saved on this Mac", channel.name, "\(Int(res.width))×\(Int(res.height))"))
+                }
+            }
+        }
+    }
+
+    private func startReducedRecording(channel: Channel, device: Device, url: URL) {
+        guard liveRecordings[channel.id] == nil, let s = acquireStream(device: device, channel: channel, kind: .sub) else { return }
+        liveRecordings[channel.id] = LiveRecording(stream: s, url: url, started: nil)
+        s.startRecording(to: url, wait: 15) { err in
+            DispatchQueue.main.async {
+                if let err {
+                    if self.liveRecordings[channel.id]?.url == url { self.liveRecordings[channel.id] = nil }
+                    self.pool.release(s)
+                    self.toast(.error, L("Cannot record"), err.localizedDescription)
+                } else {
+                    self.liveRecordings[channel.id]?.started = Date()
+                    self.toast(.warning, L("Recording at reduced quality"),
+                               L("%@: the recorder has reached its bandwidth limit, so the HD stream is not available now.", channel.name))
                 }
             }
         }
@@ -469,8 +511,16 @@ final class AppModel {
         if currentIsMain, let current { return saveSnapshot(current, channel: channel) }
         guard let s = acquireStream(device: device, channel: channel, kind: .main) else { return saveSnapshot(current, channel: channel) }
         s.snapshotWhenReady(wait: 8) { img in
+            let limited = s.isBandwidthLimited
             DispatchQueue.main.async {
                 self.pool.release(s)
+                if img == nil, limited {
+                    self.noteBandwidthLimit(channel)
+                    if current != nil {
+                        self.toast(.warning, L("Snapshot at reduced quality"),
+                                   L("%@: the recorder has reached its bandwidth limit, so the HD stream is not available now.", channel.name))
+                    }
+                }
                 self.saveSnapshot(img ?? current, channel: channel)
             }
         }

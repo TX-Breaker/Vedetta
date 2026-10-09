@@ -497,3 +497,9 @@
 "Zoom out the timeline (–)" = "Zoom out the timeline (–)";
 "Zoom the timeline in / out" = "Zoom the timeline in / out";
 "settings" = "settings";
+"%@: the recorder has reached its bandwidth limit, so the HD stream is not available now." = "%@: the recorder has reached its bandwidth limit, so the HD stream is not available now.";
+"Light stream: the recorder has reached its bandwidth limit and refused HD. Vedetta tries HD again in a few minutes." = "Light stream: the recorder has reached its bandwidth limit and refused HD. Vedetta tries HD again in a few minutes.";
+"Recording at reduced quality" = "Recording at reduced quality";
+"Snapshot at reduced quality" = "Snapshot at reduced quality";
+"The recorder has reached its bandwidth limit (%@)." = "The recorder has reached its bandwidth limit (%@).";
+"The recorder has reached its bandwidth limit (%@). Retrying…" = "The recorder has reached its bandwidth limit (%@). Retrying…";

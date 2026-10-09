@@ -497,3 +497,9 @@
 "Zoom out the timeline (–)" = "Réduire la chronologie (–)";
 "Zoom the timeline in / out" = "Agrandir / réduire la chronologie";
 "settings" = "réglages";
+"%@: the recorder has reached its bandwidth limit, so the HD stream is not available now." = "%@ : l'enregistreur a atteint sa limite de bande passante, le flux HD n'est donc pas disponible pour le moment.";
+"Light stream: the recorder has reached its bandwidth limit and refused HD. Vedetta tries HD again in a few minutes." = "Flux léger : l'enregistreur a atteint sa limite de bande passante et a refusé la HD. Vedetta réessaie la HD dans quelques minutes.";
+"Recording at reduced quality" = "Enregistrement en qualité réduite";
+"Snapshot at reduced quality" = "Capture en qualité réduite";
+"The recorder has reached its bandwidth limit (%@)." = "L'enregistreur a atteint sa limite de bande passante (%@).";
+"The recorder has reached its bandwidth limit (%@). Retrying…" = "L'enregistreur a atteint sa limite de bande passante (%@). Nouvelle tentative…";

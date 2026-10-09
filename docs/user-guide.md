@@ -55,6 +55,8 @@ On first launch Vedetta asks **what you want to connect**; later use **File › 
   - *Show video information*: codec, resolution, frame rate, bitrate, HD/SD.
 - **Snapshots and recordings** always use the **full-quality** (main) stream of the camera, even when the tile
   shows the light one. Folders: Settings › Folders.
+- If the recorder refuses HD because its bandwidth limit is reached (error 509), the tile shows the light stream
+  with a gauge icon and Vedetta tries HD again every 10 minutes; captures then use the available quality.
 - **PTZ**: on motorized cameras, PTZ button → joystick, zoom, speed, saved positions.
 - Streams pause when the window is not visible (saves CPU) and resume by themselves.
 

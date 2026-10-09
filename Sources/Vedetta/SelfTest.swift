@@ -340,6 +340,22 @@ final class SelfTest {
         await sleep(6)
         let released = model.pool.existing(key: AppModel.streamKey(dev, ch, .main)) == nil || model.layout.grid == .one
         check("live-hd-stream-released", released, "main stream closed after the capture")
+
+        // Recorder bandwidth limit on HD (RTSP 509): tiles that asked for HD switch to the light stream.
+        model.settings.liveQuality = .high
+        let hdUp = await waitUntil(15) { self.model.pool.existing(key: AppModel.streamKey(dev, ch, .main))?.status.isPlaying == true }
+        model.noteBandwidthLimit(ch)
+        model.reloadToken = UUID()
+        let fellBack = await waitUntil(15) {
+            self.model.pool.activeStreams.contains { $0.key == AppModel.streamKey(dev, ch, .sub) && $0.status.isPlaying }
+                && !self.model.pool.activeStreams.contains { $0.key == AppModel.streamKey(dev, ch, .main) }
+        }
+        check("live-bandwidth-fallback", hdUp && fellBack && model.streamKind(for: ch, tileWidth: 3000) == .sub,
+              "HD playing first \(hdUp), light stream after the limit \(fellBack)")
+        model.hdLimitedUntil[ch.id] = nil
+        model.settings.liveQuality = .low
+        model.reloadToken = UUID()
+        await sleep(3)
     }
 
     // MARK: Close the window with the red button, reopen it from the Dock

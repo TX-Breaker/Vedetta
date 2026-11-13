@@ -392,20 +392,30 @@ final class AppModel {
 
     // MARK: Files
 
-    func snapshotURL(for channel: Channel) -> URL {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let name = "\(channel.name) \(f.string(from: Date())).jpg".replacingOccurrences(of: "/", with: "-")
-        try? FileManager.default.createDirectory(at: settings.snapshotsURL, withIntermediateDirectories: true)
-        return settings.snapshotsURL.appendingPathComponent(name)
-    }
+    func snapshotURL(for channel: Channel) -> URL { Self.newFile(in: settings.snapshotsURL, channel: channel, ext: "jpg") }
 
-    func recordingURL(for channel: Channel) -> URL {
+    func recordingURL(for channel: Channel) -> URL { Self.newFile(in: settings.recordingsURL, channel: channel, ext: "mp4") }
+
+    /// Same date format whatever the Mac's calendar or digits (POSIX), so file names sort and read alike everywhere.
+    private static let fileStamp: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        let name = "\(channel.name) \(f.string(from: Date())).mp4".replacingOccurrences(of: "/", with: "-")
-        try? FileManager.default.createDirectory(at: settings.recordingsURL, withIntermediateDirectories: true)
-        return settings.recordingsURL.appendingPathComponent(name)
+        return f
+    }()
+
+    /// "<camera> <date>.<ext>" in `folder`, with " (2)", " (3)"… when a file of that name exists (two snapshots in one second).
+    private static func newFile(in folder: URL, channel: Channel, ext: String) -> URL {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let base = "\(channel.name) \(fileStamp.string(from: Date()))".replacingOccurrences(of: "/", with: "-")
+        var url = folder.appendingPathComponent("\(base).\(ext)")
+        var n = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = folder.appendingPathComponent("\(base) (\(n)).\(ext)")
+            n += 1
+        }
+        return url
     }
 
     // MARK: Live streams, full-quality recording and snapshots
@@ -629,7 +639,7 @@ final class AppModel {
         observers.append(ws.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.pool.suspend() }
         })
-        let wake: (Notification) -> Void = { [weak self] _ in
+        let wake: @Sendable (Notification) -> Void = { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, !self.visibleWindows.isEmpty else { return }
                 self.pool.resume()

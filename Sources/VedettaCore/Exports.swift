@@ -46,11 +46,13 @@ public final class ExportManager {
 
     public var activeCount: Int { jobs.filter { $0.state == .running || $0.state == .queued }.count }
 
-    public static func fileName(device: Device, channel: Channel, start: Date, end: Date) -> String {
+    nonisolated public static func fileName(device: Device, channel: Channel, start: Date, end: Date) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd HH.mm.ss"
+        f.calendar = Calendar(identifier: .gregorian)
         let g = DateFormatter()
+        g.locale = Locale(identifier: "en_US_POSIX")
         g.dateFormat = "HH.mm.ss"
         let raw = "\(channel.name) \(f.string(from: start))–\(g.string(from: end)).mp4"
         return raw.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: ".")
@@ -59,10 +61,13 @@ public final class ExportManager {
     @discardableResult
     public func enqueue(device: Device, channel: Channel, start: Date, end: Date, folder: URL, includeAudio: Bool = true) -> ExportRecord {
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        var url = folder.appendingPathComponent(Self.fileName(device: device, channel: channel, start: start, end: end))
+        let first = folder.appendingPathComponent(Self.fileName(device: device, channel: channel, start: start, end: end))
+        // " (2)", " (3)"… after the original name (which may itself contain parentheses).
+        let base = first.deletingPathExtension().lastPathComponent
+        var url = first
         var n = 2
         while FileManager.default.fileExists(atPath: url.path) || jobs.contains(where: { $0.fileURL == url && $0.state != .failed }) {
-            url = folder.appendingPathComponent(url.deletingPathExtension().lastPathComponent.components(separatedBy: " (").first! + " (\(n)).mp4")
+            url = folder.appendingPathComponent(base + " (\(n)).mp4")
             n += 1
         }
         let rec = ExportRecord(id: UUID(), deviceID: device.id, channelID: channel.id,

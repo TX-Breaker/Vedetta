@@ -8,7 +8,7 @@ public enum TrustError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .certificateChanged(let host):
-            return L("The security certificate of %@ has changed. If you replaced or reset the device, confirm the new certificate in the device settings.", host)
+            return L("The security certificate of %@ has changed. If you replaced or reset the device, accept the new certificate in Settings › Advanced › Device certificates › Forget.", host)
         }
     }
 }
@@ -19,7 +19,8 @@ public final class TrustStore: @unchecked Sendable {
     public static let shared = TrustStore()
     private let lock = NSLock()
     private var pins: [String: String] = [:]
-    private(set) public var lastMismatchHost: String?
+    /// host:port keys whose last certificate did not match the pinned one (until a matching one is seen or the pin is forgotten).
+    private var mismatched = Set<String>()
     private let fileURL: URL
 
     public init(directory: URL? = nil) {
@@ -46,25 +47,38 @@ public final class TrustStore: @unchecked Sendable {
         let k = Self.key(host: host, port: port)
         return lock.withLock {
             if let pinned = pins[k] {
-                if pinned == fp { return true }
-                lastMismatchHost = host
+                if pinned == fp { mismatched.remove(k); return true }
+                mismatched.insert(k)
                 return false
             }
             pins[k] = fp
+            mismatched.remove(k)
             save()
             return true
         }
     }
 
+    /// True when `error` comes from a certificate this store refused for host:port. A refused certificate makes
+    /// URLSession report a cancelled (or TLS-failed) request: only those errors are attributed to it, so a later
+    /// timeout of the same device is still reported as a network problem.
+    public func refusedCertificate(host: String?, port: Int, error: Error) -> Bool {
+        guard let host, let code = (error as? URLError)?.code,
+              [.cancelled, .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
+               .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid].contains(code) else { return false }
+        let k = Self.key(host: host, port: port)
+        return lock.withLock { mismatched.contains(k) }
+    }
+
     public func forget(host: String) {
         lock.withLock {
             pins = pins.filter { !$0.key.hasPrefix(host.lowercased() + ":") }
+            mismatched = mismatched.filter { !$0.hasPrefix(host.lowercased() + ":") }
             save()
         }
     }
 
     public func forgetAll() {
-        lock.withLock { pins.removeAll(); save() }
+        lock.withLock { pins.removeAll(); mismatched.removeAll(); save() }
     }
 
     private func save() {

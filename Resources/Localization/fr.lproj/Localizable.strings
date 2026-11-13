@@ -344,7 +344,8 @@
 "Wrong user name or password" = "Nom d'utilisateur ou mot de passe incorrect";
 "If you denied Vedetta access to the local network, turn it back on in System Settings › Privacy & Security › Local Network." = "Si vous avez refusé à Vedetta l'accès au réseau local, réactivez-le dans Réglages Système › Confidentialité et sécurité › Réseau local.";
 "Network unreachable: check Vedetta's Local Network permission" = "Réseau inaccessible : vérifiez l'autorisation Réseau local de Vedetta";
-"The security certificate of %@ has changed. If you replaced or reset the device, confirm the new certificate in the device settings." = "Le certificat de sécurité de %@ a changé. Si vous avez remplacé ou réinitialisé l'appareil, confirmez le nouveau certificat dans les réglages de l'appareil.";
+"A port is a number from 1 to 65535." = "Un port est un nombre de 1 à 65535.";
+"The security certificate of %@ has changed. If you replaced or reset the device, accept the new certificate in Settings › Advanced › Device certificates › Forget." = "Le certificat de sécurité de %@ a changé. Si vous avez remplacé ou réinitialisé l'appareil, acceptez le nouveau certificat dans Réglages › Avancé › Certificats des appareils › Oublier.";
 "Invalid recorder response" = "Réponse de l'enregistreur non valide";
 "Too many login attempts. Try again in %@ minutes." = "Trop de tentatives de connexion. Réessayez dans %@ minutes.";
 "The recorder returned error %@" = "L'enregistreur a renvoyé l'erreur %@";

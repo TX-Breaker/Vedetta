@@ -19,6 +19,7 @@ Everything about Vedetta, for people who use it and for people who build it.
 | Build, run, test, translate, release | [developer-guide.md](developer-guide.md) |
 | How the code is organized and why | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Copying the project to another computer | [moving-to-another-computer.md](moving-to-another-computer.md) |
+| How Vedetta came to be | [STORY.md](STORY.md) |
 | Version history | [CHANGELOG](../CHANGELOG.md) |
 | Contributing, security, code of conduct | [CONTRIBUTING](../CONTRIBUTING.md) · [SECURITY](../SECURITY.md) · [CODE_OF_CONDUCT](../CODE_OF_CONDUCT.md) |
 

@@ -24,3 +24,11 @@ GITHUB_PUBLISHING.txt
 Vedetta settings*.json
 Vedetta impostazioni*.json
 Vedetta réglages*.json
+.ai_state.md
+# Project journal for the maintainers (Italian, internal): kept on this Mac, never published
+docs/journal/
+# Launch/promotional material (video, posts, raw screenshots): published on social networks and as release
+# attachments, not as repository files
+brag-output*/
+# Local design-tool configuration
+.impeccable/

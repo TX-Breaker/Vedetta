@@ -152,8 +152,9 @@ public actor VigiClient {
         do {
             (data, status) = try await transport.post(url, body: payload, timeout: timeout)
         } catch {
+            // A refused (changed) certificate surfaces as a cancelled request: check it first.
+            if TrustStore.shared.refusedCertificate(host: host, port: port, error: error) { throw TrustError.certificateChanged(host: host) }
             if (error as? URLError)?.code == .cancelled || error is CancellationError { throw CancellationError() }
-            if let host = TrustStore.shared.lastMismatchHost, host == self.host { throw TrustError.certificateChanged(host: host) }
             throw VigiError.transport(L("Recorder not reachable (%@): %@", host, error.localizedDescription))
         }
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {

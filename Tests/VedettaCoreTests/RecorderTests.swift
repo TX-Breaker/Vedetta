@@ -5,7 +5,7 @@ import ONVIFKit
 
 @Suite struct RecorderTests {
     let dev = UUID()
-    func ch(_ n: Int, src: String?) -> Channel { var c = Channel(deviceID: dev, number: n, name: "Canale \(n)"); c.sourceToken = src; return c }
+    func ch(_ n: Int, src: String?) -> Channel { var c = Channel(deviceID: dev, number: n, name: "Channel \(n)"); c.sourceToken = src; return c }
     func rec(_ tok: String, _ src: String, _ name: String = "") -> ONVIFRecording {
         ONVIFRecording(token: tok, sourceID: src, sourceName: name, earliest: nil, latest: nil)
     }
@@ -19,7 +19,7 @@ import ONVIFKit
 
     @Test func matchesByNumberThenOrder() {
         let chans = [ch(1, src: "vs-a"), ch(2, src: "vs-b"), ch(3, src: "vs-c")]
-        let m = DeviceConnector.matchRecordings([rec("x", "", "Camera 03"), rec("y", "", "Camera 01"), rec("z", "", "Cortile")], to: chans)
+        let m = DeviceConnector.matchRecordings([rec("x", "", "Camera 03"), rec("y", "", "Camera 01"), rec("z", "", "Backyard")], to: chans)
         #expect(m[chans[2].id] == "x")
         #expect(m[chans[0].id] == "y")
         #expect(m[chans[1].id] == "z")
@@ -37,6 +37,24 @@ import ONVIFKit
         let dahua = RecorderBrand.dahua.replayURL(host: h, channel: 1, from: from, to: from.addingTimeInterval(60))!
         #expect(dahua.hasPrefix("rtsp://10.0.0.5/cam/playback?channel=1&starttime="))
         #expect(RecorderBrand.reolink.replayURL(host: h, channel: 1, from: from, to: from) == nil)
+    }
+
+    @Test func rtspHostsWithIPv6AndCustomPorts() {
+        #expect(StreamURLs.hostPort(host: "10.0.0.5", rtspPort: 554) == "10.0.0.5")
+        #expect(StreamURLs.hostPort(host: "10.0.0.5", rtspPort: 8554) == "10.0.0.5:8554")
+        #expect(StreamURLs.hostPort(host: "fd00::5", rtspPort: 554) == "[fd00::5]")
+        #expect(StreamURLs.hostPort(host: "fd00::5", rtspPort: 8554) == "[fd00::5]:8554")
+        #expect(StreamURLs.hostPort(host: "[fd00::5]", rtspPort: 554) == "[fd00::5]")
+    }
+
+    @Test func exportFileNamesIgnoreTheSystemCalendar() {
+        let d = Device(kind: .vigiNVR, name: "NVR", host: "10.0.0.5", httpPort: 443, rtspPort: 554, username: "viewer")
+        let c = Channel(deviceID: d.id, number: 1, name: "Gate (north)/2")
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
+        let start = cal.date(from: DateComponents(year: 2026, month: 3, day: 4, hour: 5, minute: 6, second: 7))!
+        let name = ExportManager.fileName(device: d, channel: c, start: start, end: start.addingTimeInterval(65))
+        #expect(name == "Gate (north)-2 2026-03-04 05.06.07–05.07.12.mp4")
     }
 
     @Test func brandGuess() {

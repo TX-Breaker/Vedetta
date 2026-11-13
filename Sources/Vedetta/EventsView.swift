@@ -135,7 +135,8 @@ struct EventCard: View {
             Button(L("Review")) { model.openPlayback(channelIDs: [event.channelID], at: event.start.addingTimeInterval(-3)) }
             Button(L("Save this event on this Mac")) {
                 if let ch, let d = model.device(for: ch) {
-                    model.exports.enqueue(device: d, channel: ch, start: event.start.addingTimeInterval(-10), end: event.end.addingTimeInterval(10), folder: model.settings.exportsURL)
+                    model.exports.enqueue(device: d, channel: ch, start: event.start.addingTimeInterval(-10), end: event.end.addingTimeInterval(10), folder: model.settings.exportsURL,
+                                          includeAudio: model.settings.exportAudio)
                     model.toast(.info, L("Export added"), "\(event.info.name) · \(ch.name)")
                 }
             }

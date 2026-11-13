@@ -162,6 +162,12 @@ public actor ONVIFClient {
         do {
             (data, response) = try await session.data(for: req)
         } catch {
+            // A refused (changed) certificate surfaces as a cancelled request: check it first.
+            let target = url ?? deviceURL
+            let port = target.port ?? (target.scheme == "https" ? 443 : 80)
+            if TrustStore.shared.refusedCertificate(host: target.host, port: port, error: error) {
+                throw TrustError.certificateChanged(host: target.host ?? "")
+            }
             if (error as? URLError)?.code == .cancelled || error is CancellationError { throw CancellationError() }
             throw ONVIFError.unreachable(error.localizedDescription)
         }

@@ -221,9 +221,9 @@ final class FakeRTSPServer: @unchecked Sendable {
         listener = l
         l.newConnectionHandler = { [weak self] c in self?.accept(c) }
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
-            var resumed = false
+            let once = ReadyOnce()
             l.stateUpdateHandler = { state in
-                if case .ready = state, !resumed { resumed = true; c.resume() }
+                if case .ready = state, once.take() { c.resume() }
             }
             l.start(queue: queue)
         }
@@ -305,4 +305,11 @@ final class FakeRTSPServer: @unchecked Sendable {
             send("200 OK", ["Session: 4242"])
         }
     }
+}
+
+/// Resumes a continuation at most once, whatever thread the listener reports on.
+final class ReadyOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func take() -> Bool { lock.withLock { if done { return false }; done = true; return true } }
 }

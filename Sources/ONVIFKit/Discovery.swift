@@ -65,7 +65,10 @@ public enum ONVIFDiscovery {
                 p.withMemoryRebound(to: sockaddr.self, capacity: 1) { recvfrom(fd, &buffer, buffer.count, 0, $0, &len) }
             }
             guard n > 0 else { continue }
-            let ip = String(cString: inet_ntoa(from.sin_addr))
+            // inet_ntop, not inet_ntoa: the latter returns a shared static buffer (not thread-safe).
+            var text = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+            guard inet_ntop(AF_INET, &from.sin_addr, &text, socklen_t(text.count)) != nil else { continue }
+            let ip = String(cString: text)
             let data = Data(buffer[0..<n])
             guard let root = XMLTree.parse(data), let match = root.first("ProbeMatch") else { continue }
             let xaddrs = (match.child("XAddrs")?.trimmedText ?? "").split(separator: " ").map(String.init)

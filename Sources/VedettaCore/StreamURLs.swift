@@ -27,9 +27,12 @@ public enum StreamURLs {
         return URL(string: "rtsp://\(hostPort(device))/replay/\(channel.number)/\(s)/avm?starttime=\(st)&endtime=\(et)")
     }
 
-    static func hostPort(_ d: Device) -> String {
-        let host = d.host.contains(":") && !d.host.hasPrefix("[") ? "[\(d.host)]" : d.host
-        return d.rtspPort == 554 ? host : "\(host):\(d.rtspPort)"
+    static func hostPort(_ d: Device) -> String { hostPort(host: d.host, rtspPort: d.rtspPort) }
+
+    /// "host" or "host:port" for an RTSP URL (IPv6 addresses in brackets).
+    static func hostPort(host: String, rtspPort: Int) -> String {
+        let h = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+        return rtspPort == 554 ? h : "\(h):\(rtspPort)"
     }
 
     /// `YYYYMMDDtHHMMSSz` (UTC) or `YYYYMMDDtHHMMSSl` (local time).

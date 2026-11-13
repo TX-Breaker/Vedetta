@@ -94,11 +94,18 @@ final class ConnectFormModel {
     var canConnect: Bool {
         guard !isConnecting, !password.isEmpty || choice == .rtsp else { return false }
         guard !username.trimmingCharacters(in: .whitespaces).isEmpty || choice == .rtsp else { return false }
+        if choice == .vigi, !Self.isValidPort(httpPort) { return false }
+        if choice == .vigi || choice == .otherRecorder, !Self.isValidPort(rtspPort) { return false }
         switch choice {
         case .vigi, .otherRecorder: return !address.trimmingCharacters(in: .whitespaces).isEmpty
         case .camera: return !address.trimmingCharacters(in: .whitespaces).isEmpty || !onvifURL.isEmpty
         case .rtsp: return URL(string: rtspURL)?.scheme?.hasPrefix("rtsp") == true
         }
+    }
+
+    /// TCP port typed in the advanced options: 1…65535.
+    static func isValidPort(_ s: String) -> Bool {
+        Int(s.trimmingCharacters(in: .whitespaces)).map { (1...65535).contains($0) } ?? false
     }
 
     func connect() async -> ConnectResult? {
@@ -113,11 +120,11 @@ final class ConnectFormModel {
             var result: ConnectResult
             switch choice {
             case .vigi:
-                result = try await DeviceConnector.connectNVR(address: address, httpPort: Int(httpPort) ?? 443, rtspPort: Int(rtspPort) ?? 554,
+                result = try await DeviceConnector.connectNVR(address: address, httpPort: Int(httpPort.trimmingCharacters(in: .whitespaces)) ?? 443, rtspPort: Int(rtspPort.trimmingCharacters(in: .whitespaces)) ?? 554,
                                                               username: user, password: password, id: id, accessGuard: g)
             case .otherRecorder:
                 result = try await DeviceConnector.connectRecorder(address: address, onvifURL: onvifURL.isEmpty ? nil : onvifURL,
-                                                                   brand: brand == .vigi ? nil : brand, rtspPort: Int(rtspPort) ?? 554,
+                                                                   brand: brand == .vigi ? nil : brand, rtspPort: Int(rtspPort.trimmingCharacters(in: .whitespaces)) ?? 554,
                                                                    username: user, password: password, id: id, accessGuard: g)
             case .camera:
                 let url = URL(string: onvifURL).flatMap { $0.host == nil ? nil : $0 }
@@ -153,6 +160,11 @@ struct ConnectFields: View {
     @Bindable var form: ConnectFormModel
     var showKindPicker = true
     @State private var advanced = false
+
+    private var portsValid: Bool {
+        (form.choice != .vigi || ConnectFormModel.isValidPort(form.httpPort))
+            && (form.choice == .camera || form.choice == .rtsp || ConnectFormModel.isValidPort(form.rtspPort))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -238,8 +250,13 @@ struct ConnectFields: View {
                         }
                     }
                     .padding(.top, 8)
+                    if !portsValid {
+                        Label(L("A port is a number from 1 to 65535."), systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
                 }
                 .font(.callout)
+                .onAppear { if !portsValid { advanced = true } }
             }
             if let err = form.error {
                 HStack(alignment: .top, spacing: 8) {

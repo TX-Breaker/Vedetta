@@ -288,31 +288,31 @@ public final class RTSPClient: @unchecked Sendable {
         // stop() may have been called before start() ran: never open a socket nobody will close.
         let alreadyClosed: Bool = await withCheckedContinuation { c in queue.async { c.resume(returning: self.closed) } }
         if alreadyClosed { throw RTSPError.closed }
-        let port = options.url.port ?? 554
+        // An out-of-range port (typed by the user) must fail like any wrong address, not trap.
+        guard let port = UInt16(exactly: options.url.port ?? 554), port > 0,
+              let nwPort = NWEndpoint.Port(rawValue: port) else { throw RTSPError.invalidURL }
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
         tcp.connectionTimeout = Int(options.connectTimeout)
         let params = NWParameters(tls: nil, tcp: tcp)
-        let conn = NWConnection(host: NWEndpoint.Host(host), port: NWEndpoint.Port(integerLiteral: UInt16(port)), using: params)
+        let conn = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: params)
         connection = conn
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            var resumed = false
+            // The handlers and the timeout both run on `queue`, but resume the continuation exactly once anyway.
+            let once = ResumeOnce()
             let timeout = DispatchWorkItem { [weak conn] in
-                guard !resumed else { return }
-                resumed = true
+                guard once.take() else { return }
                 conn?.cancel()
                 cont.resume(throwing: RTSPError.unreachable(L("no response from %@", "\(host):\(port)")))
             }
             conn.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
-                    guard !resumed else { return }
-                    resumed = true
+                    guard once.take() else { return }
                     timeout.cancel()
                     cont.resume()
                 case .failed(let err), .waiting(let err):
-                    if !resumed {
-                        resumed = true
+                    if once.take() {
                         timeout.cancel()
                         conn.cancel()
                         cont.resume(throwing: RTSPError.unreachable(err.localizedDescription))
@@ -320,7 +320,7 @@ public final class RTSPClient: @unchecked Sendable {
                         self?.close(error: RTSPError.connectionFailed(err.localizedDescription), notify: true)
                     }
                 case .cancelled:
-                    if !resumed { resumed = true; timeout.cancel(); cont.resume(throwing: RTSPError.closed) }
+                    if once.take() { timeout.cancel(); cont.resume(throwing: RTSPError.closed) }
                 default:
                     break
                 }
@@ -524,4 +524,11 @@ public final class RTSPClient: @unchecked Sendable {
             }
         }
     }
+}
+
+/// Thread-safe "first caller wins" flag (a continuation must be resumed exactly once).
+final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+    func take() -> Bool { lock.withLock { if done { return false }; done = true; return true } }
 }

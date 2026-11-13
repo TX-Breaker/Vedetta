@@ -62,7 +62,7 @@ public final class AudioDecoder {
             let count = frame.data.count / 2
             var samples = [Int16](repeating: 0, count: count)
             frame.data.withUnsafeBytes { raw in
-                for i in 0..<count { samples[i] = Int16(bigEndian: raw.load(fromByteOffset: i * 2, as: Int16.self)) }
+                for i in 0..<count { samples[i] = Int16(bigEndian: raw.loadUnaligned(fromByteOffset: i * 2, as: Int16.self)) }
             }
             return pcm(fromInt16: samples)
         case .aac:

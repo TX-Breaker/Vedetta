@@ -54,3 +54,14 @@ First public release.
   the available quality at once instead of failing after 15 s. Stream errors are now written to the connection log.
 - When another app signed in with the same recorder user and kept closing Vedetta's session, Vedetta logged in again
   every minute; it now spaces the new logins out (5 s … 5 min) while sessions keep being taken over.
+- A changed device certificate was reported as a cancelled request (so the warning never appeared), and after one
+  mismatch later network errors of that device could be reported as a certificate change; the warning now appears
+  when it should, per host and port, and points to Settings › Advanced › Device certificates.
+- An RTSP port above 65535 typed in the advanced options crashed the app; ports are now validated with a hint.
+- Quitting with exports in progress ("Quit anyway") left recordings on the Mac unfinalized; they are now closed first.
+- "Save this event on this Mac" in Events ignored the "include the audio" setting.
+- Snapshot, recording and export file names no longer depend on the Mac's calendar or digits, two snapshots in the
+  same second no longer overwrite each other, and duplicate export names keep the camera name intact.
+- RTSP addresses of brand recorders with IPv6 addresses are bracketed correctly.
+- Clean build with Swift 6.4 / Xcode 27 (no concurrency warnings); the regression script no longer reports a pass
+  when the unit tests fail to build.

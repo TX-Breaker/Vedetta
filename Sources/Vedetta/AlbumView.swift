@@ -105,7 +105,8 @@ struct AlbumView: View {
                 }
             }
             found.sort { $0.date > $1.date }
-            await MainActor.run { items = found }
+            let sorted = found
+            await MainActor.run { items = sorted }
         }
     }
 

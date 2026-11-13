@@ -26,11 +26,13 @@ public final class FrameDecoder {
                                                   outputCallback: nil, decompressionSessionOut: &s)
         guard status == noErr, let s else { return nil }
         session = s
+        // The out parameter receives a +1 CFBoolean: an explicit typed pointer keeps ARC in charge of it.
         var hw: CFBoolean?
-        if VTSessionCopyProperty(s, key: kVTDecompressionPropertyKey_UsingHardwareAcceleratedVideoDecoder,
-                                 allocator: kCFAllocatorDefault, valueOut: &hw) == noErr, let hw {
-            hardwareAccelerated = CFBooleanGetValue(hw)
+        let status2 = withUnsafeMutablePointer(to: &hw) {
+            VTSessionCopyProperty(s, key: kVTDecompressionPropertyKey_UsingHardwareAcceleratedVideoDecoder,
+                                  allocator: kCFAllocatorDefault, valueOut: UnsafeMutableRawPointer($0))
         }
+        if status2 == noErr, let hw { hardwareAccelerated = CFBooleanGetValue(hw) }
     }
 
     deinit { if let session { VTDecompressionSessionInvalidate(session) } }

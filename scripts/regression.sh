@@ -43,8 +43,11 @@ if swift build 2>&1 | tail -1 | grep -q "Build complete"; then ok "swift build";
 # 2. Unit tests + localization (the CLT build system sometimes misses the Testing macro plugin: retry)
 if [[ -z $QUICK ]]; then
   log "[2] Unit tests and translations"
-  for i in 1 2 3; do swift build --build-tests >/dev/null 2>&1 && break; done
-  UT=$(swift test --skip-build 2>&1)
+  TESTS_BUILT=0
+  for i in 1 2 3; do swift build --build-tests >/dev/null 2>&1 && { TESTS_BUILT=1; break; }; done
+  # Never run a stale test binary: a test build that keeps failing is a failure, not a pass.
+  if (( TESTS_BUILT )); then ok "unit tests build"; else ko "unit tests build" "$(swift build --build-tests 2>&1 | grep -m3 'error:' | tr '\n' ' ')"; fi
+  UT=$( (( TESTS_BUILT )) && swift test --skip-build 2>&1 || print "unit tests not built")
   expect "unit tests" "$UT" "Test run with [0-9]+ tests? .*passed"
   if print -r -- "$UT" | grep -q "✘"; then ko "unit test failures" "$(print -r -- "$UT" | grep '✘' | head -5 | tr '\n' ' ')"; fi
   expect "translations complete (en, it, fr)" "$(python3 scripts/l10n.py --check 2>&1)" " 0 problems"

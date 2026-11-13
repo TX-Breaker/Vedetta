@@ -1,7 +1,7 @@
 import Foundation
 import CoreMedia
 import RTSPKit
-import MediaKit
+@preconcurrency import MediaKit
 import ONVIFKit
 import VigiKit
 import VedettaCore
@@ -265,14 +265,14 @@ enum RTSPProbe {
             print("snapshot: \(snapshotPath) \(img.width)x\(img.height)")
         }
         if let rec = st.recorder {
-            let sem = DispatchSemaphore(value: 0)
-            client.queue.async {
-                rec.finish { url, err in
-                    print(url != nil ? "recording: \(url!.path) frames=\(rec.videoFrames)" : "recording failed: \(err?.localizedDescription ?? "")")
-                    sem.signal()
-                }
+            // MP4Recorder lives on the client's queue: finish it there and wait for the file.
+            let frames = await withCheckedContinuation { (c: CheckedContinuation<Int, Never>) in
+                client.queue.async { c.resume(returning: rec.videoFrames) }
             }
-            sem.wait()
+            let (url, err): (URL?, Error?) = await withCheckedContinuation { c in
+                client.queue.async { rec.finish { url, err in c.resume(returning: (url, err)) } }
+            }
+            print(url != nil ? "recording: \(url!.path) frames=\(frames)" : "recording failed: \(err?.localizedDescription ?? "")")
         }
     }
 }

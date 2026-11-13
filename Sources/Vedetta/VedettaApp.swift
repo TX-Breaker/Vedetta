@@ -69,7 +69,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         alert.informativeText = L("There are %@ unfinished exports. If you quit they will be interrupted and resumed at the next launch.", String(busy))
         alert.addButton(withTitle: L("Quit anyway"))
         alert.addButton(withTitle: L("Cancel"))
-        return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        guard recording else { return .terminateNow }
+        // Recordings on this Mac still need their MP4 files closed, exports or not.
+        MainActor.assumeIsolated { model?.finishAllRecordings { NSApp.reply(toApplicationShouldTerminate: true) } }
+        return .terminateLater
     }
 
     func applicationWillTerminate(_ notification: Notification) {

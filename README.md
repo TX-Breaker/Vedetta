@@ -23,9 +23,20 @@
 
 Vedetta replaces heavyweight Windows video-management software (often run on the Mac through
 Wine/CrossOver) with a truly native app: hardware video decoding, a Liquid Glass interface for macOS 26,
-and a tiny CPU footprint — **16 cameras live at ~10–13 % CPU** on an Apple Silicon Mac.
+and a tiny CPU footprint — **16 cameras live at ~10–13 % CPU** on an Apple Silicon Mac, where the Windows
+client under CrossOver used a full core and about 2 GB of memory for the same grid.
 
-> Screenshots: see [docs/images](docs/images) (add yours before publishing a release).
+<!-- SCREENSHOTS -->
+
+| | Windows client under CrossOver | Vedetta |
+|---|---|---|
+| CPU for a live grid | 100–150 % of a core | ~10–13 % for 16 cameras |
+| Memory | ~2 GB | ~230 MB |
+| Video decoding | software, emulated | Apple media engine (VideoToolbox) |
+| Recorder brands | VIGI only | VIGI, ONVIF of any brand, Hikvision, Dahua, Reolink, Uniview, RTSP |
+
+Why it exists, the day an early build locked a real recorder, and how it was built:
+**[the story of Vedetta](docs/STORY.md)**.
 
 ## Features
 

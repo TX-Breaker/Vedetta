@@ -185,7 +185,7 @@ public enum DeviceConnector {
     /// device accepts them; only then the others are probed in parallel (parallel wrong passwords lock accounts).
     static func probeRTSPChannels(host: String, rtspPort: Int, username: String, password: String, deviceID: UUID,
                                   accessGuard: AccessGuard? = nil) async throws -> [Channel] {
-        let hp = rtspPort == 554 ? host : "\(host):\(rtspPort)"
+        let hp = StreamURLs.hostPort(host: host, rtspPort: rtspPort)
         let found = try await probeChannels(count: 16, accessGuard: accessGuard, url: { URL(string: "rtsp://\(hp)/live/\($0)/2/avm") },
                                             username: username, password: password)
         return found.map { n in
@@ -410,7 +410,7 @@ public enum DeviceConnector {
     /// RTSP-only recorder using the brand's URL layout; channels found by probing.
     public static func connectBrandRecorder(host: String, brand: RecorderBrand, rtspPort: Int, username: String, password: String,
                                             id: UUID = UUID(), accessGuard: AccessGuard? = nil) async throws -> ConnectResult {
-        let hp = rtspPort == 554 ? host : "\(host):\(rtspPort)"
+        let hp = StreamURLs.hostPort(host: host, rtspPort: rtspPort)
         let found: [Int]
         do {
             found = try await probeChannels(count: 32, accessGuard: accessGuard, url: { URL(string: brand.liveURL(host: hp, channel: $0, main: false)) },

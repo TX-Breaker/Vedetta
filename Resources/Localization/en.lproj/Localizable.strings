@@ -344,7 +344,8 @@
 "Wrong user name or password" = "Wrong user name or password";
 "If you denied Vedetta access to the local network, turn it back on in System Settings › Privacy & Security › Local Network." = "If you denied Vedetta access to the local network, turn it back on in System Settings › Privacy & Security › Local Network.";
 "Network unreachable: check Vedetta's Local Network permission" = "Network unreachable: check Vedetta's Local Network permission";
-"The security certificate of %@ has changed. If you replaced or reset the device, confirm the new certificate in the device settings." = "The security certificate of %@ has changed. If you replaced or reset the device, confirm the new certificate in the device settings.";
+"A port is a number from 1 to 65535." = "A port is a number from 1 to 65535.";
+"The security certificate of %@ has changed. If you replaced or reset the device, accept the new certificate in Settings › Advanced › Device certificates › Forget." = "The security certificate of %@ has changed. If you replaced or reset the device, accept the new certificate in Settings › Advanced › Device certificates › Forget.";
 "Invalid recorder response" = "Invalid recorder response";
 "Too many login attempts. Try again in %@ minutes." = "Too many login attempts. Try again in %@ minutes.";
 "The recorder returned error %@" = "The recorder returned error %@";

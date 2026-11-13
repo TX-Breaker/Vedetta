@@ -66,6 +66,7 @@ enum SettingsTransfer {
     static func export(model: AppModel) {
         let panel = NSSavePanel()
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy-MM-dd"
         panel.nameFieldStringValue = "Vedetta \(L("settings")) \(f.string(from: Date())).json"
         panel.allowedContentTypes = [.json]
@@ -108,7 +109,8 @@ enum AppRelauncher {
         // Start the new instance once this one has quit.
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "sleep 1; /usr/bin/open \"\(url.path)\""]
+        // The path is passed as an argument ($0), never pasted into the shell command.
+        task.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", url.path]
         try? task.run()
         NSApp.terminate(nil)
     }

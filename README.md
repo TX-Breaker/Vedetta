@@ -11,12 +11,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/TX-Breaker/vedetta/releases/latest"><img src="https://img.shields.io/github/v/release/TX-Breaker/vedetta?label=download" alt="Latest release"></a>
+  <a href="https://github.com/TX-Breaker/Vedetta/releases/latest"><img src="https://img.shields.io/github/v/release/TX-Breaker/Vedetta?label=download" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-26%2B-blue" alt="macOS 26+">
   <img src="https://img.shields.io/badge/Apple%20Silicon-native-black" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/languages-EN%20·%20IT%20·%20FR-teal" alt="Languages">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
-  <a href="https://github.com/TX-Breaker/vedetta/actions"><img src="https://github.com/TX-Breaker/vedetta/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/TX-Breaker/Vedetta/actions"><img src="https://github.com/TX-Breaker/Vedetta/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 ---
@@ -27,6 +27,10 @@ and a tiny CPU footprint — **16 cameras live at ~10–13 % CPU** on an Apple S
 client under CrossOver used a full core and about 2 GB of memory for the same grid.
 
 <!-- SCREENSHOTS -->
+
+<p align="center">
+  <img src="docs/images/launch-demo.gif" width="720" alt="22-second tour of Vedetta: live view, recordings, MP4 export">
+</p>
 
 | | Windows client under CrossOver | Vedetta |
 |---|---|---|
@@ -89,7 +93,7 @@ Video: H.264 and H.265/HEVC. Audio: G.711 (µ-law/A-law), AAC, PCM.
 
 ## Install
 
-1. Download `Vedetta-x.y.z-macOS.dmg` from the [latest release](https://github.com/TX-Breaker/vedetta/releases/latest).
+1. Download `Vedetta-x.y.z-macOS.dmg` from the [latest release](https://github.com/TX-Breaker/Vedetta/releases/latest).
 2. Drag **Vedetta** to **Applications**.
 3. First launch: if the build is not notarized, macOS may say it cannot verify the developer.
    Right-click Vedetta → **Open**, or run `xattr -dr com.apple.quarantine /Applications/Vedetta.app`.
@@ -100,7 +104,7 @@ Video: H.264 and H.265/HEVC. Audio: G.711 (µ-law/A-law), AAC, PCM.
 ## Build from source
 
 ```bash
-git clone https://github.com/TX-Breaker/vedetta.git
+git clone https://github.com/TX-Breaker/Vedetta.git
 cd vedetta
 scripts/bootstrap.sh               # checks the requirements (changes nothing)
 scripts/build-app.sh --install     # builds dist/Vedetta.app, installs it in /Applications and pins it to the Dock
